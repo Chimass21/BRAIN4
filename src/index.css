@@ -1,0 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Print layout overrides for lesson plans & certificates */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm 10mm 8mm 10mm;
+  }
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  nav, header, footer, button, .lg:col-span-1, .sticky, [role="tablist"], .no-print, aside {
+    display: none !important;
+  }
+  .max-w-4xl, .max-w-7xl, .w-full {
+    max-w: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .lg:col-span-3 {
+    grid-column: span 4 / span 4 !important;
+  }
+  
+  /* Ensure structural lines on table are 100% visible on printed document and downloaded PDFs */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    border: 1.5px solid #000000 !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+  }
+  th, td {
+    border: 1px solid #1e293b !important;
+    padding: 6px 8px !important;
+    line-height: 1.25 !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  th {
+    background-color: #f1f5f9 !important;
+    font-weight: bold !important;
+  }
+
+  #active_note_text_block, #ai_question_pool_printable {
+    border: none !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    font-size: var(--note-font-size, 10pt) !important;
+    line-height: 1.15 !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+  #active_note_text_block *, #ai_question_pool_printable * {
+    font-size: var(--note-font-size, 10pt) !important;
+    line-height: 1.15 !important;
+  }
+  #active_note_text_block h5, #ai_question_pool_printable h5, #active_note_text_block h5 *, #ai_question_pool_printable h5 * {
+    font-size: calc(var(--note-font-size, 10pt) + 2.5pt) !important;
+    margin-top: 5px !important;
+    margin-bottom: 2px !important;
+    color: #1e3a8a !important;
+    font-weight: 800 !important;
+  }
+  #active_note_text_block .grid, #ai_question_pool_printable .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 4px 12px !important;
+    border-bottom-width: 1px !important;
+    padding-bottom: 4px !important;
+    margin-bottom: 6px !important;
+  }
+
+  /* Ultra-compact lesson plan parameters to fit strictly on ONE single A4 landscape page regardless of count */
+  #active_plan_printable {
+    border: none !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    overflow: visible !important;
+    font-size: var(--plan-font-size, 9.5pt) !important;
+    line-height: 1.1 !important;
+  }
+  #active_plan_printable * {
+    font-size: var(--plan-font-size, 9.5pt) !important;
+    line-height: 1.1 !important;
+  }
+  #active_plan_printable h5, #active_plan_printable h5 * {
+    font-size: calc(var(--plan-font-size, 9.5pt) + 2.5pt) !important;
+    margin-top: 4px !important;
+    margin-bottom: 1px !important;
+    color: #111827 !important;
+    font-weight: 900 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding-bottom: 2px !important;
+  }
+  #active_plan_printable table {
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  #active_plan_printable th, #active_plan_printable td, #active_plan_printable th *, #active_plan_printable td * {
+    padding: 3px 5px !important;
+    font-size: calc(var(--plan-font-size, 9.5pt) * 0.95) !important;
+    line-height: 1.1 !important;
+    border: 1px solid #475569 !important;
+  }
+  #active_plan_printable .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 2px 6px !important;
+    border-bottom-width: 1px !important;
+    padding-bottom: 2px !important;
+    margin-bottom: 3px !important;
+  }
+}
+
+/* Global resets for subscript & superscript elements to bypass framework baseline preflight wipes */
+sub {
+  vertical-align: sub !important;
+  font-size: 75% !important;
+  line-height: 0 !important;
+  margin-left: 1px !important;
+  margin-right: 1px !important;
+}
+sup {
+  vertical-align: super !important;
+  font-size: 75% !important;
+  line-height: 0 !important;
+  margin-left: 1px !important;
+  margin-right: 1px !important;
+}
+
