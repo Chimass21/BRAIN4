@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { BookOpen, GraduationCap, Clock, Award, HelpCircle, ArrowRight, TrendingUp, Sparkles, LogOut, CheckCircle, Wallet, Plus, Upload, Download, Copy, Printer, Check, Trash2, Edit3, MessageSquare, AlertCircle, FileSpreadsheet, School, FileText, Volume2, FolderOpen } from "lucide-react";
+import { BookOpen, GraduationCap, Clock, Award, HelpCircle, ArrowRight, TrendingUp, Sparkles, LogOut, CheckCircle, Wallet, Plus, Upload, Download, Copy, Printer, Check, Trash2, Edit3, MessageSquare, AlertCircle, FileSpreadsheet, School, FileText, Volume2, FolderOpen, Layers } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Exam, Question, LessonPlan, LessonNote, Transaction } from "../types";
 import { renderFormattedMath } from "../lib/mathUtils";
 import { VoiceInputButton } from "./VoiceInputButton";
 import { speakText, stopSpeech } from "../utils/tts";
 import MyLibrary from "./MyLibrary";
+import SchemeOfWorkDashboard from "./SchemeOfWorkDashboard";
 
 const renderFormattedList = (text: string | undefined) => {
   if (!text) return null;
@@ -47,7 +48,7 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>([]);
   const [lessonNotes, setLessonNotes] = useState<LessonNote[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [activeTab, setActiveTab] = useState<"exams" | "planner" | "notes" | "ai_questions" | "wallet" | "results" | "reports" | "library">("exams");
+  const [activeTab, setActiveTab] = useState<"exams" | "planner" | "notes" | "ai_questions" | "wallet" | "results" | "reports" | "library" | "scheme">("exams");
   const [selectedDownloadItem, setSelectedDownloadItem] = useState<{ type: "plan" | "note" | "exam" | "report"; data: any } | null>(null);
   const [isPlayingDownloadTTS, setIsPlayingDownloadTTS] = useState(false);
   const [isIframe, setIsIframe] = useState(false);
@@ -1271,6 +1272,7 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
             { id: "notes", label: "Lesson Notes", icon: <Sparkles className="w-4 h-4" /> },
             { id: "ai_questions", label: "Question Pool", icon: <Award className="w-4 h-4" /> },
             { id: "library", label: "My Personal Library", icon: <FolderOpen className="w-4 h-4" /> },
+            { id: "scheme", label: "Scheme of Work", icon: <Layers className="w-4 h-4" /> },
             { id: "results", label: "Student CBT Results", icon: <TrendingUp className="w-4 h-4" /> },
             { id: "reports", label: "Term Report Cards", icon: <School className="w-4 h-4" /> },
             { id: "wallet", label: "School Wallet Portal", icon: <Wallet className="w-4 h-4" /> },
@@ -1281,7 +1283,8 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
               tab.id === "planner" ? "bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-lg shadow-teal-550/30 scale-[1.03] border-none" :
               tab.id === "notes" ? "bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg shadow-emerald-500/30 scale-[1.03] border-none" :
               tab.id === "ai_questions" ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30 scale-[1.03] border-none" :
-              tab.id === "library" ? "bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg shadow-teal-500/30 scale-[1.03] border-none" :
+              tab.id === "library" ? "bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg shadow-teal-550/30 scale-[1.03] border-none" :
+              tab.id === "scheme" ? "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-[1.03] border-none" :
               tab.id === "results" ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/30 scale-[1.03] border-none" :
               tab.id === "reports" ? "bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-lg shadow-pink-500/30 scale-[1.03] border-none" :
               "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/30 scale-[1.03] border-none";
@@ -1292,6 +1295,7 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
               tab.id === "notes" ? "bg-green-300" :
               tab.id === "ai_questions" ? "bg-violet-300" :
               tab.id === "library" ? "bg-teal-300" :
+              tab.id === "scheme" ? "bg-purple-300" :
               tab.id === "results" ? "bg-amber-300" :
               tab.id === "reports" ? "bg-rose-300" :
               "bg-cyan-300";
@@ -1387,6 +1391,7 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
                 {activeTab === "notes" && "Notebook Authoring"}
                 {activeTab === "ai_questions" && "Assessment Pool"}
                 {activeTab === "library" && "Personal Library Portal"}
+                {activeTab === "scheme" && "Nigerian Curriculum Scheme of Work"}
                 {activeTab === "results" && "Student CBT Exam Results"}
                 {activeTab === "reports" && "Academic Report Sheets & Collation"}
                 {activeTab === "wallet" && "Transactions & Billing"}
@@ -1397,6 +1402,7 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
                 {activeTab === "notes" && "Write detailed outlines, definition glossaries, and practice worksheets."}
                 {activeTab === "ai_questions" && "Access questions, mock simulations, or custom syllabus blocks."}
                 {activeTab === "library" && "Indefinite persistent storage and instant custom AI research planners."}
+                {activeTab === "scheme" && "Access officially authorized NERDC school syllabus timelines, track taught lessons, and download Word worksheets."}
                 {activeTab === "results" && "Consolidated student score reports on CBT examinations. View raw mark indexes, grades, or compile all student results on a single file."}
                 {activeTab === "reports" && "Configure profile, automate term collation from CBT marks, or input student sheet grades manually."}
                 {activeTab === "wallet" && "Monitor balance limits, secure payments, fund with mock gateways."}
@@ -2807,6 +2813,19 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
                       }
                     } catch (e) {}
                   }} />
+                </motion.div>
+              )}
+
+              {/* NIGERIAN SCHEME OF WORK PORTAL */}
+              {activeTab === "scheme" && (
+                <motion.div
+                  key="scheme"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6"
+                >
+                  <SchemeOfWorkDashboard user={user} userPerspective="teacher" />
                 </motion.div>
               )}
 

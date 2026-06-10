@@ -149,3 +149,28 @@ export interface AppStatistics {
   resultCount: number;
   totalPayments: number;
 }
+
+export interface WeeklySchemeUnit {
+  week: number;
+  topic: string;
+  subtopic: string;
+  objectives: string;
+  teachingActivities: string;
+  studentActivities: string;
+  assessment: string;
+  notes: string;
+  homework: string;
+  isTaught?: boolean;
+  taughtDate?: string;
+  teacherNote?: string;
+}
+
+export interface SchemeOfWork {
+  id: string;
+  classLevel: string;
+  subject: string;
+  term: "First Term" | "Second Term" | "Third Term";
+  weeks: WeeklySchemeUnit[];
+  updatedAt?: string;
+}
+

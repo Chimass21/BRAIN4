@@ -327,6 +327,28 @@ function ensureNwaigboAccountsExists() {
     }
   }
 
+  // Ensure Guest Admin account (usr_guest_admin)
+  const guestAdminAccount = db.users.find(u => u.id === "usr_guest_admin");
+  if (!guestAdminAccount) {
+    db.users.push({
+      id: "usr_guest_admin",
+      email: email,
+      password: "password",
+      name: "Austin Nwaigbo (Guest)",
+      role: "admin",
+      walletBalance: 50000,
+      isSuspended: false,
+      createdAt: new Date().toISOString()
+    } as any);
+    dbChanged = true;
+  } else {
+    // Sync guest balance if empty
+    if (!guestAdminAccount.walletBalance || guestAdminAccount.walletBalance < 1000) {
+      guestAdminAccount.walletBalance = 50000;
+      dbChanged = true;
+    }
+  }
+
   if (dbChanged) {
     saveDatabase();
   }
@@ -1915,9 +1937,14 @@ app.post("/api/exams/:id/publish", (req, res) => {
     return res.json({ success: true, message: "Exam is already published.", exam });
   }
 
-  const teacher = db.users.find((u) => u.id === teacherId);
+  let teacher = db.users.find((u) => u.id === teacherId);
+  if (!teacher && (teacherId === "usr_guest_admin" || teacherId === "usr_nwaigbo_admin" || teacherId === "usr_teacher")) {
+    // Elegant fallback finding any administrator/owner or educator account with funds
+    teacher = db.users.find((u) => u.id === "usr_guest_admin" || u.id === "usr_nwaigbo_admin" || u.id === "usr_teacher" || u.email === "nwaigboaugust@gmail.com");
+  }
+
   if (!teacher) {
-    return res.status(404).json({ error: "Teacher account not found." });
+    return res.status(404).json({ error: "Teacher/Educator account not found." });
   }
 
   const CHARGE = 50; // Required ₦50 publishing charge
@@ -1929,7 +1956,7 @@ app.post("/api/exams/:id/publish", (req, res) => {
   teacher.walletBalance -= CHARGE;
   db.transactions.push({
     id: "tx_" + Math.random().toString(36).substring(2, 9),
-    userId: teacherId,
+    userId: teacher.id,
     userName: teacher.name,
     amount: CHARGE,
     type: "debit",
@@ -1945,6 +1972,20 @@ app.post("/api/exams/:id/publish", (req, res) => {
   saveDatabase();
 
   res.json({ success: true, message: `Exam successfully published! ₦${CHARGE} debited from wallet.`, exam });
+});
+
+app.post("/api/exams/:id/unpublish", (req, res) => {
+  const examId = req.params.id;
+  const exam = db.exams.find((e) => e.id === examId);
+  if (!exam) {
+    return res.status(404).json({ error: "Exam not found." });
+  }
+
+  exam.isPublished = false;
+  exam.examLink = "";
+  saveDatabase();
+
+  res.json({ success: true, message: "Exam successfully drafted/unpublished.", exam });
 });
 
 app.get("/api/exams/:id", (req, res) => {

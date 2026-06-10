@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BookOpen, GraduationCap, Clock, Award, HelpCircle, ArrowRight, TrendingUp, Sparkles, LogOut, CheckCircle, ListTodo, FileText, Printer, Trophy, Sliders, Edit3, Volume2, FolderOpen, Flame, Play, Tv, UploadCloud, Check, Calendar } from "lucide-react";
+import { BookOpen, GraduationCap, Clock, Award, HelpCircle, ArrowRight, TrendingUp, Sparkles, LogOut, CheckCircle, ListTodo, FileText, Printer, Trophy, Sliders, Edit3, Volume2, FolderOpen, Flame, Play, Tv, UploadCloud, Check, Calendar, Layers } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { motion, AnimatePresence } from "motion/react";
 import { Exam, ExamResult, Question } from "../types";
@@ -7,6 +7,7 @@ import { renderFormattedMath } from "../lib/mathUtils";
 import { VoiceInputButton } from "./VoiceInputButton";
 import { speakText } from "../utils/tts";
 import MyLibrary from "./MyLibrary";
+import SchemeOfWorkDashboard from "./SchemeOfWorkDashboard";
 
 interface StudentDashboardProps {
   user: any;
@@ -18,7 +19,7 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
   const [exams, setExams] = useState<Exam[]>([]);
   const [allExams, setAllExams] = useState<Exam[]>([]);
   const [results, setResults] = useState<ExamResult[]>([]);
-  const [activeTab, setActiveTab] = useState<"exams" | "report_card" | "results" | "practice" | "notifications" | "library">("exams");
+  const [activeTab, setActiveTab] = useState<"exams" | "report_card" | "results" | "practice" | "notifications" | "library" | "scheme">("exams");
   const [loading, setLoading] = useState(false);
   const [reportSheets, setReportSheets] = useState<any[]>([]);
   const [localSelectedTerm, setLocalSelectedTerm] = useState("First Term");
@@ -558,6 +559,7 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
             { id: "report_card", label: "My Term report card", icon: <FileText className="w-4 h-4" /> },
             { id: "results", label: "Scores and reports", icon: <TrendingUp className="w-4 h-4" /> },
             { id: "practice", label: "Study revision", icon: <Sparkles className="w-4 h-4" /> },
+            { id: "scheme", label: "Scheme of Work", icon: <Layers className="w-4 h-4" /> },
             { id: "library", label: "My Library Portal", icon: <FolderOpen className="w-4 h-4" /> },
             { id: "notifications", label: "Alert", icon: <CheckCircle className="w-4 h-4" /> },
           ].map((tab) => {
@@ -656,6 +658,7 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
                 {activeTab === "report_card" && "My Terminal report card"}
                 {activeTab === "results" && "Scores and reports"}
                 {activeTab === "practice" && "Study revision"}
+                {activeTab === "scheme" && "Curriculum Scheme of Work"}
                 {activeTab === "library" && "My Personal Library"}
                 {activeTab === "notifications" && "Alert"}
               </h1>
@@ -664,6 +667,7 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
                 {activeTab === "report_card" && "View your official terminal results, cognitive rankings, and printed progress sheets."}
                 {activeTab === "results" && "Track performance grades, subject progressions, and print certificates."}
                 {activeTab === "practice" && "Generate custom revision drills directly for self-study revision drills. Note: Only educators can create/publish official CBT exams."}
+                {activeTab === "scheme" && "Read terminal subjects outlines, study lesson notes, download worksheets and track weekly homework tasks."}
                 {activeTab === "library" && "Persistent database of all your class notes, custom worksheets, exam study modules, and resources."}
                 {activeTab === "notifications" && "Check updates, invitations, and alerts sent from your educators."}
               </p>
@@ -1847,6 +1851,18 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
                   className="space-y-6"
                 >
                   <MyLibrary user={user} />
+                </motion.div>
+              )}
+
+              {activeTab === "scheme" && (
+                <motion.div
+                  key="scheme"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6"
+                >
+                  <SchemeOfWorkDashboard user={user} userPerspective="student" />
                 </motion.div>
               )}
 
