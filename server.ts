@@ -12,13 +12,13 @@ let SUPABASE_URL = (
   process.env.SUPABASE_PROJECT_URL || 
   process.env.VITE_SUPABASE_URL || 
   process.env.NEXT_PUBLIC_SUPABASE_URL || 
-  "https://eodftrtqpcvixotqcjeb.supabase.co"
+  ""
 ).trim();
 
-if (SUPABASE_URL.endsWith("/")) {
+if (SUPABASE_URL && SUPABASE_URL.endsWith("/")) {
   SUPABASE_URL = SUPABASE_URL.slice(0, -1);
 }
-if (SUPABASE_URL.includes("/rest/v1")) {
+if (SUPABASE_URL && SUPABASE_URL.includes("/rest/v1")) {
   SUPABASE_URL = SUPABASE_URL.replace("/rest/v1", "");
 }
 
@@ -29,7 +29,7 @@ const SUPABASE_ANON_KEY = (
   process.env.SUPABASE_ANON || 
   process.env.VITE_SUPABASE_ANON_KEY || 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvZGZ0cnRxcGN2aXhvdHFjamViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NjM4NDQsImV4cCI6MjA5NTUzOTg0NH0.jEdzvsA5fCcmDleZLmKeAptULBlVp7HAKzT4FirW3uM"
+  ""
 ).trim();
 
 let supabase: any = null;
