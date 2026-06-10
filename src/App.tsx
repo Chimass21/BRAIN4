@@ -139,9 +139,31 @@ export default function App() {
 
     try {
       if (authTab === 'register') {
+        // Validation Checks
+        if (!fullName || fullName.trim().length < 2) {
+          throw new Error('Unable to create account. Please enter a valid name of at least 2 characters.');
+        }
+
+        if (!emailAddress) {
+          throw new Error('Invalid email.');
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(emailAddress)) {
+          throw new Error('Invalid email.');
+        }
+
+        if (!password || password.length < 8) {
+          throw new Error('Password must be at least 8 characters.');
+        }
+
+        if (password !== confirmPassword) {
+          throw new Error('Passwords do not match.');
+        }
+
         const payload = {
-          name: fullName,
-          email: emailAddress,
+          name: fullName.trim(),
+          email: emailAddress.trim(),
           password,
           confirmPassword,
           role: registerRole
@@ -155,12 +177,13 @@ export default function App() {
 
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to register account.');
+          throw new Error(data.error || 'Unable to create account. Please try again.');
         }
 
-        setAuthSuccess(`Academic profile generated! Accessing Swiftstudy...`);
-        setCurrentUser(data.user);
+        // Display Welcome message first, then redirect to dashboard after a short delay
+        setAuthSuccess(`Welcome ${data.user.name}! Account created successfully.`);
         setTimeout(() => {
+          setCurrentUser(data.user);
           setShowAuthModal(false);
           // Reset form
           setFullName('');
@@ -171,7 +194,7 @@ export default function App() {
 
       } else {
         // Login code path
-        const payload = { email: emailAddress, password };
+        const payload = { email: emailAddress.trim(), password };
         const response = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -183,9 +206,9 @@ export default function App() {
           throw new Error(data.error || 'Failed to authenticate.');
         }
 
-        setAuthSuccess('Sign-in authenticated! Directing to dashboard...');
-        setCurrentUser(data.user);
+        setAuthSuccess(`Welcome back ${data.user.name}! Sign-in authenticated successfully.`);
         setTimeout(() => {
+          setCurrentUser(data.user);
           setShowAuthModal(false);
           setEmailAddress('');
           setPassword('');
@@ -203,19 +226,14 @@ export default function App() {
       
       const isFailedToFetch = err.message && err.message.toLowerCase().includes('failed to fetch');
       if (isFailedToFetch) {
-        console.error('Failed to fetch indicates a network level or CORS policy error before the server could send headers.');
-        console.error('Diagnostics checklist:');
-        console.error('1. Check if the backend on port 3000 crashed. Run restart_dev_server if needed.');
-        console.error('2. Confirm if modern browser security blocked cross-origin routing.');
-        console.error('3. Check if server response handles preflight OPTIONS requests.');
+        console.error('Failed to fetch indicates a network level or CORS policy error.');
         console.groupEnd();
-        
         setAuthError(
-          'Network Connection Issue (failed to fetch). This typically indicates that you are in a non-standard preview client environment, the API server on port 3000 has been paused/restarted, or a cross-origin CORS policy request was blocked. Please check your browser developer tools console (F12) for detailed logs, and try reloading the page.'
+          'Email already exists or connection is offline. Please try again.'
         );
       } else {
         console.groupEnd();
-        setAuthError(err.message || 'Verification failed. Try again.');
+        setAuthError(err.message || 'Unable to create account. Please try again.');
       }
     } finally {
       setAuthLoading(false);

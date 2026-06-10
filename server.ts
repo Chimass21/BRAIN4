@@ -247,10 +247,6 @@ function ensureStudentRegNumbers() {
         u.regNumber = `REG/${new Date().getFullYear()}/${2000 + i}`;
         modified = true;
       }
-      if (u.password !== "12345") {
-        u.password = "12345";
-        modified = true;
-      }
     }
   });
   if (modified) {
@@ -809,21 +805,25 @@ app.post("/api/auth/register", (req, res) => {
 
     const { name, email, password, confirmPassword, role } = req.body;
 
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({ error: "All registration fields are required." });
+    if (!name || name.trim().length < 2) {
+      return res.status(400).json({ error: "Unable to create account. Please enter a valid name of at least 2 characters." });
     }
 
-    if (password !== confirmPassword) {
-      return res.status(400).json({ error: "Passwords do not match." });
+    if (!email) {
+      return res.status(400).json({ error: "Invalid email." });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: "Please enter a valid email address." });
+      return res.status(400).json({ error: "Invalid email." });
     }
 
-    if (password.length < 5) {
-      return res.status(400).json({ error: "Password must be at least 5 characters long." });
+    if (!password || password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters." });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: "Passwords do not match." });
     }
 
     if (role === "admin") {
@@ -834,9 +834,9 @@ app.post("/api/auth/register", (req, res) => {
       return res.status(400).json({ error: "Invalid registration profile path selected." });
     }
 
-    const existingUser = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const existingUser = db.users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
     if (existingUser) {
-      return res.status(400).json({ error: "This email address is already registered on Swiftstudy." });
+      return res.status(400).json({ error: "Email already exists." });
     }
 
     const newUserId = "usr_" + Math.random().toString(36).substring(2, 9);
@@ -882,7 +882,7 @@ app.post("/api/auth/register", (req, res) => {
 
   } catch (err: any) {
     console.error("Registration error:", err);
-    return res.status(500).json({ error: err.message || "An unexpected error occurred during account creation." });
+    return res.status(500).json({ error: "Unable to create account. Please try again." });
   }
 });
 
