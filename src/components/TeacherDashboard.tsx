@@ -64,7 +64,7 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
 
   // 6. SCHOOL CONFIGURATION & REPORT CARD STATES
   const [schoolConfig, setSchoolConfig] = useState<any>({
-    schoolName: "Brain International Academy",
+    schoolName: "Swiftstudy International Academy",
     location: "Lagos, Nigeria",
     term: "First Term",
     timesOpened: 120,
@@ -168,7 +168,7 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
   const [uploadedFileName, setUploadedFileName] = useState("");
 
   // 2. AI LESSON PLAN FORM STATE
-  const [spinSchool, setSpinSchool] = useState("Brain International Academy");
+  const [spinSchool, setSpinSchool] = useState("Swiftstudy International Academy");
   const [spinTeacher, setSpinTeacher] = useState(user.name);
   const [spinClass, setSpinClass] = useState("Junior Secondary School 2");
   const [spinSubject, setSpinSubject] = useState("Mathematics");
@@ -1261,9 +1261,9 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
         {/* Brand Container */}
         <div className="p-6 flex items-center space-x-3">
           <div className="w-10 h-10 bg-gradient-to-tr from-amber-400 via-pink-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-pink-500/30">
-            <span className="text-2xl font-black font-sans text-white">B</span>
+            <span className="text-2xl font-black font-sans text-white">S</span>
           </div>
-          <span className="text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-pink-400 to-cyan-400">Brain</span>
+          <span className="text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-pink-400 to-cyan-400">Swiftstudy</span>
         </div>
         <nav className="flex-1 px-4 py-4 space-y-1">
           {[
@@ -4528,7 +4528,7 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
                         Current Term: {sheet.term || "Academic Term"} assessment
                       </p>
                       <p className="text-[8px] text-slate-400 font-semibold tracking-wider">
-                        Powering high academic standards via Brain CBT Engine • Secured Academic Record
+                        Powering high academic standards via Swiftstudy CBT Engine • Secured Academic Record
                       </p>
                     </div>
                   </div>

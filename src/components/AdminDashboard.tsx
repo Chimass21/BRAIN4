@@ -155,9 +155,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         {/* Brand Container */}
         <div className="p-6 flex items-center space-x-3">
           <div className="w-10 h-10 bg-gradient-to-tr from-rose-505 to-slate-800 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/10 bg-rose-600">
-            <span className="text-2xl font-bold font-sans text-white">B</span>
+            <span className="text-2xl font-bold font-sans text-white">S</span>
           </div>
-          <span className="text-2xl font-black tracking-tight text-white font-sans">Brain</span>
+          <span className="text-2xl font-black tracking-tight text-white font-sans">Swiftstudy</span>
         </div>
         
         <nav className="flex-1 px-4 py-4 space-y-1">

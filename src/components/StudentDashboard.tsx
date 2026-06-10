@@ -548,9 +548,9 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
         {/* Brand Container */}
         <div className="p-6 flex items-center space-x-3">
           <div className="w-10 h-10 bg-gradient-to-tr from-cyan-400 to-indigo-505 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 bg-indigo-500">
-            <span className="text-2xl font-bold font-sans">B</span>
+            <span className="text-2xl font-bold font-sans">S</span>
           </div>
-          <span className="text-2xl font-black tracking-tight text-white font-sans">Brain</span>
+          <span className="text-2xl font-black tracking-tight text-white font-sans">Swiftstudy</span>
         </div>
         
         <nav className="flex-1 px-4 py-4 space-y-1">
@@ -1228,8 +1228,8 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
                     <div id="student_cumulative_report_view" className="p-6 sm:p-8 bg-white border border-slate-150 rounded-3xl shadow-xs space-y-6">
                       <div className="border-b pb-4 text-center space-y-2">
                         <div className="flex items-center justify-center gap-2">
-                          <span className="w-8 h-8 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center">B</span>
-                          <span className="text-xl font-black tracking-tight text-slate-950">Brain Academic Portal</span>
+                          <span className="w-8 h-8 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center">S</span>
+                          <span className="text-xl font-black tracking-tight text-slate-950">Swiftstudy Academic Portal</span>
                         </div>
                         <h2 className="text-lg font-extrabold text-slate-900 tracking-tight uppercase">Cumulative Academic Performance Ledger</h2>
                         <p className="text-xs text-slate-500 font-semibold font-sans">{user.name.toUpperCase()} • Comprehensive Annual Aggregation</p>
@@ -1432,7 +1432,7 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
 
                           {/* Print Action button */}
                           <div className="pt-4 border-t flex items-center justify-between text-xs text-slate-400">
-                            <span>Brain System collator verified on: {new Date().toLocaleDateString()}</span>
+                            <span>Swiftstudy System collator verified on: {new Date().toLocaleDateString()}</span>
                             <div className="flex flex-wrap items-center gap-2">
                               <button
                                 type="button"

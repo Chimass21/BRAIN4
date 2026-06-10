@@ -430,7 +430,7 @@ export default function ExamEngine({ exam, studentUser, onExit }: ExamEngineProp
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="bg-slate-900 text-white rounded-xl py-1 px-3.5 font-bold text-xs uppercase tracking-wider">
-              🧠 Brain CBT Engine
+              🧠 Swiftstudy CBT Engine
             </span>
             <div>
               <h1 className="text-base font-extrabold text-slate-900 line-clamp-1">{exam.title}</h1>

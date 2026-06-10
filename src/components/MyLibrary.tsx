@@ -1056,7 +1056,7 @@ export default function MyLibrary({ user, onRefreshWallet }: MyLibraryProps) {
               <div className="space-y-1 text-[11px]">
                 <p className="font-black">Dynamic Wallet Deductions apply:</p>
                 <p className="font-medium">
-                  Generating Schemes of Work, assignments or worksheets costs <strong>₦20</strong>. Lesson Plans and Notes cost <strong>₦50</strong>. This fee is automatically simulated and deducted from your Brain system wallet portal.
+                  Generating Schemes of Work, assignments or worksheets costs <strong>₦20</strong>. Lesson Plans and Notes cost <strong>₦50</strong>. This fee is automatically simulated and deducted from your Swiftstudy system wallet portal.
                 </p>
               </div>
             </div>

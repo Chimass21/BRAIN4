@@ -1,5 +1,5 @@
 {
-  "name": "Brain",
+  "name": "Swiftstudy",
   "description": "An AI-powered CBT exam, lesson plan, and education analytics platform.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

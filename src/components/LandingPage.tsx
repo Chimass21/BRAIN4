@@ -149,10 +149,10 @@ export default function LandingPage({ onGetStarted, onLoginClick, onSelectExam }
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 via-purple-600 to-cyan-500 text-white font-black text-lg shadow-lg shadow-purple-500/35">
-               B
+               S
              </span>
             <span className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-700 to-cyan-600">
-              Brain
+              Swiftstudy
             </span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-bold text-slate-600">
@@ -345,7 +345,7 @@ export default function LandingPage({ onGetStarted, onLoginClick, onSelectExam }
               <span className="w-3 h-3 rounded-full bg-rose-500 block" />
               <span className="w-3 h-3 rounded-full bg-amber-500 block" />
               <span className="w-3 h-3 rounded-full bg-emerald-500 block" />
-              <span className="text-xs font-mono text-slate-400 ml-4 font-bold">Brain.Edu Dashboard Preview / CBT Arena</span>
+              <span className="text-xs font-mono text-slate-400 ml-4 font-bold">Swiftstudy.Edu Dashboard Preview / CBT Arena</span>
             </div>
             <div className="p-8 sm:p-12 bg-white flex flex-col md:flex-row gap-8 items-center justify-between text-left">
               <div className="space-y-4 max-w-md">
@@ -456,11 +456,11 @@ export default function LandingPage({ onGetStarted, onLoginClick, onSelectExam }
                 {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />)}
               </div>
               <p className="text-xs text-slate-700 italic leading-relaxed">
-                "Generating lesson notes used to take hours of manual copy pasting. With Brain, I generated a 3-week lesson note and evaluation questions in 2 minutes. The Nigerian syllabus alignment is spot-on!"
+                "Generating lesson notes used to take hours of manual copy pasting. With Swiftstudy, I generated a 3-week lesson note and evaluation questions in 2 minutes. The Nigerian syllabus alignment is spot-on!"
               </p>
               <div>
                 <p className="text-xs font-bold text-slate-900">Mrs. Abigail Johnson</p>
-                <p className="text-[10px] text-slate-400 font-semibold">Vice Principal, Brains Academy, Lagos</p>
+                <p className="text-[10px] text-slate-400 font-semibold">Vice Principal, Swiftstudy Academy, Lagos</p>
               </div>
             </div>
 
@@ -605,7 +605,7 @@ export default function LandingPage({ onGetStarted, onLoginClick, onSelectExam }
                   </div>
                 </a>
                 <a
-                  href="https://wa.me/2348062078597?text=Hello%20Brain%20Educational%20Suite"
+                  href="https://wa.me/2348062078597?text=Hello%20Swiftstudy%20Educational%20Suite"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 p-2 rounded-2xl hover:bg-emerald-50 transition group cursor-pointer block"
@@ -724,9 +724,9 @@ export default function LandingPage({ onGetStarted, onLoginClick, onSelectExam }
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-violet-600 text-white font-bold text-base">
-                B
+                S
               </span>
-              <span className="text-lg font-black tracking-tight">Brain</span>
+              <span className="text-lg font-black tracking-tight">Swiftstudy</span>
             </div>
             <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
               Nigeria's state-of-the-art educational interface transforming CBT examiners, bulk lesson planners, and student grading profiles.
@@ -736,19 +736,19 @@ export default function LandingPage({ onGetStarted, onLoginClick, onSelectExam }
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Quick Portal links</h4>
             <div className="flex flex-col gap-2 text-xs text-slate-400 font-semibold">
-              <button onClick={() => onLoginClick('student')} className="text-left hover:text-white transition">Access Portal Login</button>
+              <button onClick={() => onLoginClick('student')} className="text-left hover:text-white transition cursor-pointer border-none bg-transparent">Access Portal Login</button>
             </div>
           </div>
 
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Direct Contact lines</h4>
             <a href="tel:08062078597" className="text-xs text-slate-400 hover:text-white transition font-semibold block">📞 Call: 08062078597</a>
-            <a href="https://wa.me/2348062078597?text=Hello%20Brain%20Support" target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-400 hover:text-emerald-300 transition font-semibold block">💬 WhatsApp: 08062078597</a>
+            <a href="https://wa.me/2348062078597?text=Hello%20Swiftstudy%20Support" target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-400 hover:text-emerald-300 transition font-semibold block">💬 WhatsApp: 08062078597</a>
             <a href="mailto:nwaigboaugust@gmail.com" className="text-xs text-slate-400 hover:text-white transition block font-semibold leading-relaxed">✉ Email: nwaigboaugust@gmail.com</a>
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-800 mt-8 pt-8 text-center text-xs text-slate-500 font-semibold">
-          <p>© {new Date().getFullYear()} Brain Education. All rights Reserved to authorized school districts.</p>
+          <p>© {new Date().getFullYear()} Swiftstudy Education. All rights Reserved to authorized school districts.</p>
         </div>
       </footer>
     </div>

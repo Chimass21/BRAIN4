@@ -1,10 +1,9 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Sparkles, BrainCircuit, School, BookOpen, GraduationCap, ArrowRight, Check, Star, Shield, MessageSquare, Phone } from 'lucide-react';
+import { Sparkles, BrainCircuit, School, BookOpen, GraduationCap, ArrowRight, Check, Star, Shield, MessageSquare, Phone, X, Lock, Mail, User } from 'lucide-react';
 import LandingPage from './components/LandingPage';
 import StudentDashboard from './components/StudentDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import AdminDashboard from './components/AdminDashboard';
-import OnboardingDashboard from './components/OnboardingDashboard';
 import ExamEngine from './components/ExamEngine';
 import FloatingSupportChat from './components/FloatingSupportChat';
 import { Exam } from './types';
@@ -16,16 +15,51 @@ export default function App() {
   const [guestStudentName, setGuestStudentName] = useState('');
   const [admissionStep, setAdmissionStep] = useState<'inputName' | 'startExam'>('inputName');
   const [activeExamStudentName, setActiveExamStudentName] = useState('');
-  const [userPerspective, setUserPerspective] = useState<'student' | 'teacher' | 'admin'>('teacher');
   const [guestExamCompleted, setGuestExamCompleted] = useState<{ studentName: string; examTitle: string } | null>(null);
-  const [onboardingTriggerVal, setOnboardingTriggerVal] = useState(0);
-  
+
+  // Authentication UI States
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const [registerRole, setRegisterRole] = useState<'student' | 'teacher'>('student');
+  const [authError, setAuthError] = useState('');
+  const [authSuccess, setAuthSuccess] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // Registration Form Fields
+  const [fullName, setFullName] = useState('');
+  const [emailAddress, setEmailAddress] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Admin route separation states
+  const [isAdminRoute, setIsAdminRoute] = useState(
+    window.location.hash === '#/admin' || window.location.pathname === '/admin'
+  );
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminError, setAdminError] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
+
   // Security checking states for CBT attempts & standard 50 Naira gate charge
   const [candidateAuthError, setCandidateAuthError] = useState('');
-  const [candidateAttemptsCount, setCandidateAttemptsCount] = useState(0);
   const [initiatingAttempt, setInitiatingAttempt] = useState(false);
 
-  // Parse custom parameters on initial mount (e.g., student joins exam link from whatsapp/url)
+  useEffect(() => {
+    // Listen to URL hash and path adjustments for Separate Admin Portal Routing
+    const handleUrlChange = () => {
+      setIsAdminRoute(
+        window.location.hash === '#/admin' || window.location.pathname === '/admin'
+      );
+    };
+    window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('popstate', handleUrlChange);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('popstate', handleUrlChange);
+    };
+  }, []);
+
+  // Parse custom parameters on initial mount (e.g., student joins exam link from url query or hash)
   const parseExamLinkQuery = async (examsList: Exam[]) => {
     const hash = window.location.hash || '';
     const params = new URLSearchParams(window.location.search);
@@ -49,34 +83,17 @@ export default function App() {
   const checkUserSession = async () => {
     setSessionLoading(true);
     try {
-      // Automatic configuration of persistent admin guest session
-      let localUserStr = localStorage.getItem('brain_guest_user');
-      let userObj = null;
-      if (localUserStr) {
-        try {
-          userObj = JSON.parse(localUserStr);
-        } catch (e) {
-          userObj = null;
+      const res = await fetch('/api/auth/session');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setCurrentUser(data.user);
+        } else {
+          setCurrentUser(null);
         }
+      } else {
+        setCurrentUser(null);
       }
-
-      if (!userObj) {
-        userObj = {
-          id: 'usr_guest_admin', // Fixed to match parent backend fallback guest account synchronization!
-          name: 'Austin Nwaigbo',
-          email: 'nwaigboaugust@gmail.com',
-          role: 'admin',
-          regNumber: 'REG-2026-NWAIGBO',
-          walletBalance: 25000,
-          classLevel: 'Senior Secondary Section 3'
-        };
-        localStorage.setItem('brain_guest_user', JSON.stringify(userObj));
-      }
-
-      setCurrentUser(userObj);
-
-      const savedPerspective = localStorage.getItem('brain_perspective');
-      setUserPerspective((savedPerspective as any) || 'teacher');
 
       // Fetch exams List to check instant link joining hooks
       const examRes = await fetch('/api/exams');
@@ -87,6 +104,7 @@ export default function App() {
       }
     } catch (e) {
       console.error('Session sync offline:', e);
+      setCurrentUser(null);
     } finally {
       setSessionLoading(false);
     }
@@ -94,31 +112,145 @@ export default function App() {
 
   useEffect(() => {
     checkUserSession();
-    
-    // Hash change detector
-    const handleHashChange = () => {
-      fetch('/api/exams')
-        .then((r) => r.json())
-        .then((data) => parseExamLinkQuery(data.exams || []));
-    };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [currentUser?.id]);
+  }, []);
 
   const handleLogout = async () => {
     try {
-      // Clear local credentials to emulate session reset, then rebuild instant guest access
-      localStorage.removeItem('brain_guest_user');
-      localStorage.removeItem('brain_perspective');
-      await checkUserSession();
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setCurrentUser(null);
+      // If admin was logged out, refresh route
+      if (isAdminRoute) {
+        setAdminEmail('');
+        setAdminPassword('');
+      } else {
+        setShowAuthModal(false);
+      }
     } catch (e) {
       console.error(e);
     }
   };
 
-  const handleOpenAuth = (role: 'student' | 'teacher' | 'admin') => {
-    setUserPerspective(role);
-    localStorage.setItem('brain_perspective', role);
+  // Submit standard student/teacher registration/login handler
+  const handleAuthSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthSuccess('');
+    setAuthLoading(true);
+
+    try {
+      if (authTab === 'register') {
+        const payload = {
+          name: fullName,
+          email: emailAddress,
+          password,
+          confirmPassword,
+          role: registerRole
+        };
+
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to register account.');
+        }
+
+        setAuthSuccess(`Academic profile generated! Accessing Swiftstudy...`);
+        setCurrentUser(data.user);
+        setTimeout(() => {
+          setShowAuthModal(false);
+          // Reset form
+          setFullName('');
+          setEmailAddress('');
+          setPassword('');
+          setConfirmPassword('');
+        }, 1200);
+
+      } else {
+        // Login code path
+        const payload = { email: emailAddress, password };
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to authenticate.');
+        }
+
+        setAuthSuccess('Sign-in authenticated! Directing to dashboard...');
+        setCurrentUser(data.user);
+        setTimeout(() => {
+          setShowAuthModal(false);
+          setEmailAddress('');
+          setPassword('');
+        }, 1200);
+      }
+    } catch (err: any) {
+      setAuthError(err.message || 'Verification failed. Try again.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Submit secure ADMIN Login separate flow
+  const handleAdminLoginSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setAdminError('');
+    setAdminLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: adminEmail, password: adminPassword })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Authentication error.');
+      }
+
+      // Check role separation
+      if (data.user.role !== 'admin') {
+        throw new Error('Access Denied: Non-administrator accounts do not have clearance to enter the Admin Portal.');
+      }
+
+      setCurrentUser(data.user);
+    } catch (err: any) {
+      setAdminError(err.message || 'Admin authentication failed.');
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!emailAddress) {
+      setAuthError('Please enter your registered email address first.');
+      return;
+    }
+    setAuthError('');
+    setAuthSuccess('');
+    try {
+      const response = await fetch('/api/auth/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailAddress })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setAuthSuccess(data.message || 'Reset guidelines sent successfully!');
+      } else {
+        setAuthError(data.error || 'Could not trigger password reset.');
+      }
+    } catch {
+      setAuthError('Error reaching core authentication server.');
+    }
   };
 
   if (sessionLoading) {
@@ -126,9 +258,9 @@ export default function App() {
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans space-y-4">
         <div className="relative">
           <span className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white font-bold text-2xl shadow-xl animate-bounce">
-            B
+            S
           </span>
-          <span className="absolute inset-0 rounded-2xl bg-violet-500 animate-ping opacity-25" />
+          <span className="absolute inset-0 rounded-2xl bg-indigo-500 animate-ping opacity-25" />
         </div>
         <div className="text-center">
           <p className="text-sm font-black text-slate-800">Bootstrapping school structures...</p>
@@ -150,7 +282,7 @@ export default function App() {
         setInitiatingAttempt(true);
 
         try {
-          // 1. Verify Attempt limit per candidate name
+          // 1. Verify Attempt limits per name
           const checkRes = await fetch(`/api/exams/${selectedCBTExam.id}/check-attempts?studentName=${encodeURIComponent(trimmed)}`);
           if (!checkRes.ok) {
             throw new Error("Could not verify attempt status on core server.");
@@ -162,7 +294,7 @@ export default function App() {
             return;
           }
 
-          // 2. Perform Standard Take charge authentication
+          // 2. Take exam initiation action
           const startRes = await fetch(`/api/exams/${selectedCBTExam.id}/start-attempt`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -176,8 +308,6 @@ export default function App() {
             return;
           }
 
-          // Proceed to CBT and show standard attempt message
-          setCandidateAttemptsCount(startData.attemptNumber);
           setActiveExamStudentName(trimmed);
           setAdmissionStep('startExam');
         } catch (err: any) {
@@ -203,19 +333,17 @@ export default function App() {
               </p>
             </div>
 
-            {/* Error messaging block */}
             {candidateAuthError && (
               <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs text-left rounded-2xl font-bold font-sans">
                 {candidateAuthError}
               </div>
             )}
 
-            {/* Live CBT Exam Details Info Card */}
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-left space-y-2 text-xs font-sans">
               <p className="font-semibold text-slate-600"><strong className="text-slate-800">CBT Exam:</strong> {selectedCBTExam.title}</p>
               <p className="font-semibold text-slate-600"><strong className="text-slate-800">Subject:</strong> {selectedCBTExam.subject} ({selectedCBTExam.level})</p>
               <p className="font-semibold text-slate-600"><strong className="text-slate-800">Duration:</strong> {selectedCBTExam.duration} Minutes</p>
-              <p className="font-bold text-violet-600 p-1 bg-violet-50 rounded-lg text-[10px] uppercase tracking-wider block text-center">CBT Standard Taking Fee: ₦50 Direct Debit</p>
+              <p className="font-bold text-indigo-600 p-1 bg-indigo-50/50 rounded-lg text-[10px] uppercase tracking-wider block text-center">CBT Standard Taking Fee: ₦50 Direct Debit</p>
             </div>
             
             <div className="space-y-2 text-left">
@@ -229,7 +357,7 @@ export default function App() {
                 placeholder="e.g., John Doe"
                 value={guestStudentName}
                 onChange={(ev) => setGuestStudentName(ev.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition text-sm"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm"
               />
             </div>
 
@@ -262,7 +390,7 @@ export default function App() {
             </div>
             
             <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-              Secure CBT Engine by Brain AI
+              Secure CBT Engine by Swiftstudy
             </p>
           </form>
         </div>
@@ -281,7 +409,6 @@ export default function App() {
           walletBalance: 0,
         }}
         onExit={() => {
-          // If the student is a direct link guest (not registered/logged in), redirect to the custom completion thank-you screen!
           if (!currentUser) {
             setGuestExamCompleted({
               studentName: activeExamStudentName,
@@ -331,120 +458,157 @@ export default function App() {
     );
   }
 
-  // Dashboard state routing
-  if (currentUser) {
-    const adaptedUser = {
-      ...currentUser,
-      role: userPerspective,
-    };
-
-    // Dynamically check onboarding completed for the current user and perspective
-    const isPerspectiveOnboarded = 
-      userPerspective === 'admin' || 
-      localStorage.getItem(`brain_onboarded_${userPerspective}_${currentUser.id}`) === 'true';
-
-    if (!isPerspectiveOnboarded) {
+  // A: COMPLETELY SEPARATE ADMIN PORTAL ROUTE LAYOUT (/admin)
+  if (isAdminRoute) {
+    // If logged in as admin already, render Admin Portal
+    if (currentUser && currentUser.role === 'admin') {
       return (
-        <OnboardingDashboard
-          user={currentUser}
-          role={userPerspective}
-          onComplete={(updatedData) => {
-            // Save on-boarded marker
-            localStorage.setItem(`brain_onboarded_${userPerspective}_${currentUser.id}`, 'true');
-            // Merge onboarding academic data into profile
-            const updatedUser = {
-              ...currentUser,
-              ...updatedData
-            };
-            setCurrentUser(updatedUser);
-            localStorage.setItem('brain_guest_user', JSON.stringify(updatedUser));
-            // Trigger local state re-evaluation
-            setOnboardingTriggerVal(prev => prev + 1);
-          }}
-        />
+        <div className="min-h-screen flex flex-col bg-slate-900">
+          <div className="bg-slate-950 border-b border-indigo-950 px-6 py-3 flex items-center justify-between text-white shrink-0">
+            <div className="flex items-center gap-3">
+              <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="text-xs">
+                <span className="text-slate-400">Authenticated Admin: </span>
+                <strong className="text-emerald-400">{currentUser.name}</strong>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-1.5 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/60 rounded-xl text-rose-300 text-xs font-bold transition cursor-pointer"
+            >
+              Exit System
+            </button>
+          </div>
+          <div className="flex-grow flex flex-col">
+            <AdminDashboard user={currentUser} onLogout={handleLogout} />
+          </div>
+          <FloatingSupportChat />
+        </div>
       );
     }
 
+    // Otherwise, Render completely isolated Secure Admin Login Portal
     return (
-      <div className="min-h-screen flex flex-col bg-slate-50">
-        {/* Integrated Dual/Triple-Perspective Switcher Header */}
-        <div className="bg-slate-900 border-b border-slate-950 text-slate-100 px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-md shrink-0">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 selection:bg-indigo-500 selection:text-white">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
+
+        <div className="max-w-md w-full bg-slate-900/40 backdrop-blur-xl p-8 rounded-3xl border border-indigo-950/60 shadow-2xl relative z-10 space-y-6">
+          <div className="text-center space-y-2">
+            <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600 text-white font-extrabold text-2xl shadow-lg relative mb-2">
+              S
+            </span>
+            <h1 className="text-2xl font-black text-white font-sans tracking-tight">Admin Portal Secure Entrance</h1>
+            <p className="text-xs text-slate-400 font-medium">
+              Only authorized personnel can access the administrator settings board.
+            </p>
+          </div>
+
+          {adminError && (
+            <div className="p-3.5 bg-rose-950/40 border border-rose-900/60 text-rose-300 text-xs rounded-2xl font-bold font-sans">
+              {adminError}
+            </div>
+          )}
+
+          <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
+            <div className="space-y-1.5 text-left">
+              <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Admin Email Address</label>
+              <input
+                type="email"
+                required
+                placeholder="e.g. administrator@swiftstudy.com"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                className="w-full bg-slate-950/50 border border-indigo-950/60 rounded-xl px-4 py-3 text-slate-200 text-sm focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition font-medium"
+              />
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Admin Password</label>
+              <input
+                type="password"
+                required
+                placeholder="••••••••"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                className="w-full bg-slate-950/50 border border-indigo-950/60 rounded-xl px-4 py-3 text-slate-200 text-sm focus:outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition font-medium"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={adminLoading}
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black text-xs rounded-xl transition uppercase tracking-wider cursor-pointer shadow-lg"
+            >
+              {adminLoading ? 'Authenticating access clearance...' : 'Authenticate Admin Access'}
+            </button>
+          </form>
+
+          <div className="text-center pt-2">
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setIsAdminRoute(false);
+                window.location.hash = '';
+              }}
+              className="text-xs font-bold text-slate-400 hover:text-indigo-400 transition"
+            >
+              ← Cancel and Return to Swiftstudy homepage
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // B: STUDENT & TEACHER COMPLETED SECURE SESSIONS
+  if (currentUser) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-50 font-sans selection:bg-indigo-500 selection:text-white">
+        {/* Simple & Clean Status Header representing correct Persona */}
+        <div className="bg-slate-900 border-b border-slate-950 text-slate-100 px-6 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4 shadow-md shrink-0">
           <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+            <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 text-white font-black text-md">
+              S
+            </span>
             <div className="text-xs">
-              <span className="text-slate-400 font-medium font-sans">Active Profile: </span>
-              <strong className="text-white font-extrabold font-sans">{currentUser.name}</strong> 
-              <span className="text-[10px] bg-slate-800 text-slate-300 ml-2 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider font-mono">
-                {userPerspective === "admin" ? "Administrator Portal" : userPerspective === "teacher" ? "Educator Profile" : "Candidate Student"}
+              <span className="text-slate-400 font-medium font-sans">User: </span>
+              <strong className="text-white font-extrabold font-sans pr-1">{currentUser.name}</strong>
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300">
+                {currentUser.role === 'teacher' ? 'Educator Portfolio' : 'Candidate Student'}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest font-mono">Viewing Perspective:</span>
-            <div className="inline-flex rounded-xl bg-slate-800/80 p-0.5 border border-slate-700/60 shadow-inner">
-              <button
-                type="button"
-                onClick={() => {
-                  setUserPerspective('student');
-                  localStorage.setItem('brain_perspective', 'student');
-                }}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-black tracking-wide transition-all ease-out duration-150 cursor-pointer ${
-                  userPerspective === 'student'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/20'
-                }`}
-              >
-                Student Portal
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setUserPerspective('teacher');
-                  localStorage.setItem('brain_perspective', 'teacher');
-                }}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-black tracking-wide transition-all ease-out duration-150 cursor-pointer ${
-                  userPerspective === 'teacher'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/20'
-                }`}
-              >
-                Teachers Portal
-              </button>
-              {currentUser?.role === 'admin' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUserPerspective('admin');
-                    localStorage.setItem('brain_perspective', 'admin');
-                  }}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-black tracking-wide transition-all ease-out duration-150 cursor-pointer ${
-                    userPerspective === 'admin'
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/20'
-                  }`}
-                >
-                  Admin System
-                </button>
-              )}
+          <div className="flex items-center gap-4">
+            {currentUser.regNumber && (
+              <span className="text-slate-400 text-xs font-mono font-bold tracking-wider uppercase">
+                ID: {currentUser.regNumber}
+              </span>
+            )}
+            <div className="h-4 w-[1px] bg-slate-700 hidden md:block" />
+            <div className="text-xs text-indigo-400 font-bold bg-indigo-950/40 px-3 py-1 rounded-lg border border-indigo-900/60 flex items-center gap-1.5 font-mono">
+              💳 Bal: ₦{(currentUser.walletBalance || 0).toLocaleString()}
             </div>
+            <button
+              onClick={handleLogout}
+              className="px-3.5 py-1.5 bg-slate-850 hover:bg-slate-800 rounded-lg text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
+            >
+              Sign out
+            </button>
           </div>
         </div>
 
         <div className="flex-grow flex flex-col">
-          {userPerspective === 'admin' ? (
-            <AdminDashboard
-              user={adaptedUser}
-              onLogout={handleLogout}
-            />
-          ) : userPerspective === 'teacher' ? (
+          {currentUser.role === 'teacher' ? (
             <TeacherDashboard
-              user={adaptedUser}
+              user={currentUser}
               onLogout={handleLogout}
             />
           ) : (
             <StudentDashboard
-              user={adaptedUser}
+              user={currentUser}
               onLogout={handleLogout}
               onTakeExam={(exam) => setSelectedCBTExam(exam)}
             />
@@ -456,14 +620,257 @@ export default function App() {
     );
   }
 
-  // Fallback fallback render (Visitor Landing page can be accessed if sessionStorage state is deleted)
+  // C: PUBLIC HOMEPAGE & UNIFIED MODAL DIALOGS
   return (
     <>
       <LandingPage
-        onGetStarted={() => handleOpenAuth('teacher')}
-        onLoginClick={(role) => handleOpenAuth(role)}
+        onGetStarted={() => {
+          setAuthTab('register');
+          setShowAuthModal(true);
+        }}
+        onLoginClick={() => {
+          setAuthTab('login');
+          setShowAuthModal(true);
+        }}
         onSelectExam={(exam) => setSelectedCBTExam(exam)}
       />
+
+      {/* Dynamic Unified Student / Teacher Access portal Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs font-sans">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="bg-slate-50 border-b border-slate-100 p-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">
+                  {authTab === 'login' ? 'Portal Account Sign-In' : 'Join academic profile'}
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  {authTab === 'login' ? 'Returning candidate or educator entrance' : 'Swiftstudy registration workspace'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAuthModal(false);
+                  setAuthError('');
+                  setAuthSuccess('');
+                }}
+                className="p-1.5 hover:bg-slate-200/60 rounded-full text-slate-450 hover:text-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[80vh] space-y-6">
+              
+              {/* Errors Display */}
+              {authError && (
+                <div className="p-3 bg-rose-50 border border-rose-250 text-rose-700 text-xs rounded-2xl font-bold">
+                  {authError}
+                </div>
+              )}
+              {authSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-250 text-emerald-700 text-xs rounded-2xl font-bold">
+                  {authSuccess}
+                </div>
+              )}
+
+              {/* REGISTER SUB-VIEW ROLE SECTION */}
+              {authTab === 'register' && (
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-150 space-y-3">
+                  <span className="text-[10px] text-slate-500 font-black uppercase tracking-wider block">
+                    Choose Your Account Profile Type
+                  </span>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setRegisterRole('student')}
+                      className={`p-3 rounded-xl border text-left transition relative cursor-pointer ${
+                        registerRole === 'student'
+                          ? 'bg-indigo-50 border-indigo-400 text-indigo-950 ring-2 ring-indigo-500/10'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-350'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <input
+                          type="radio"
+                          name="profile_role"
+                          checked={registerRole === 'student'}
+                          onChange={() => setRegisterRole('student')}
+                          className="accent-indigo-600"
+                        />
+                        <span className="text-xs font-black">Student</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-medium leading-tight">Access assignments, CBT exams, syllabus items, report sheets</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRegisterRole('teacher')}
+                      className={`p-3 rounded-xl border text-left transition relative cursor-pointer ${
+                        registerRole === 'teacher'
+                          ? 'bg-indigo-50 border-indigo-400 text-indigo-950 ring-2 ring-indigo-500/10'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-350'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <input
+                          type="radio"
+                          name="profile_role"
+                          checked={registerRole === 'teacher'}
+                          onChange={() => setRegisterRole('teacher')}
+                          className="accent-indigo-600"
+                        />
+                        <span className="text-xs font-black">Teacher</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-medium leading-tight">Draft schemes, upload documents, generate questions & CBT</p>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleAuthSubmit} className="space-y-4">
+                {authTab === 'register' && (
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-wider block">
+                      Full Name
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g., Jane Doe"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-hidden focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] text-slate-500 font-black uppercase tracking-wider block">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="e.g., student@swiftstudy.edu"
+                      value={emailAddress}
+                      onChange={(e) => setEmailAddress(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-hidden focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] text-slate-500 font-black uppercase tracking-wider block">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-hidden focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                    />
+                  </div>
+                </div>
+
+                {authTab === 'register' && (
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-wider block">
+                      Confirm Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-hidden focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-750 hover:to-indigo-750 disabled:opacity-50 text-white font-extrabold text-sm rounded-xl transition cursor-pointer shadow-md"
+                  >
+                    {authLoading ? (
+                      'Processing profile requests...'
+                    ) : authTab === 'login' ? (
+                      'Login'
+                    ) : registerRole === 'student' ? (
+                      'Create Student Account'
+                    ) : (
+                      'Create Teacher Account'
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              {/* Auth helpers footer section */}
+              <div className="flex flex-col gap-2.5 text-center text-xs text-slate-500 border-t border-slate-100 pt-4 font-semibold">
+                {authTab === 'login' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      className="text-violet-600 hover:text-violet-850 transition block font-bold cursor-pointer"
+                    >
+                      Forgot Password
+                    </button>
+                    <p>
+                      Already new to the community?{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthTab('register');
+                          setAuthError('');
+                          setAuthSuccess('');
+                        }}
+                        className="text-indigo-600 hover:text-indigo-850 underline transition font-extrabold cursor-pointer"
+                      >
+                        Create Account
+                      </button>
+                    </p>
+                  </>
+                ) : (
+                  <p>
+                    Returning to academic portal?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthTab('login');
+                        setAuthError('');
+                        setAuthSuccess('');
+                      }}
+                      className="text-indigo-600 hover:text-indigo-850 underline transition font-extrabold cursor-pointer"
+                    >
+                      Login instead
+                    </button>
+                  </p>
+                )}
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
 
       <FloatingSupportChat />
     </>

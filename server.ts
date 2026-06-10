@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
@@ -39,6 +40,11 @@ if (SUPABASE_URL && SUPABASE_ANON_KEY) {
   } catch (error) {
     console.error("Failed to initialize Supabase Client:", error);
   }
+}
+
+export function hashPassword(password: string): string {
+  if (!password) return "";
+  return crypto.createHash("sha256").update(password).digest("hex");
 }
 
 // Initialize Gemini client on the server as per the API guide.
@@ -768,6 +774,9 @@ async function callGemini(prompt: string, jsonMode = false, schema?: any) {
 app.get("/api/auth/session", (req, res) => {
   try {
     const authUser = getAuthenticatedUser(req);
+    if (!authUser) {
+      return res.json({ user: null });
+    }
     return res.json({
       user: {
         id: authUser.id,
@@ -776,7 +785,9 @@ app.get("/api/auth/session", (req, res) => {
         role: authUser.role,
         regNumber: authUser.regNumber,
         walletBalance: authUser.walletBalance,
-        classLevel: authUser.classLevel
+        classLevel: authUser.classLevel,
+        schoolName: authUser.schoolName || "",
+        experience: authUser.experience || ""
       }
     });
   } catch (error: any) {
@@ -786,25 +797,162 @@ app.get("/api/auth/session", (req, res) => {
 });
 
 app.post("/api/auth/logout", (req, res) => {
-  // Authentication is disabled; logout simply returns success without affecting the persistent guest state
-  return res.json({ success: true, message: "Logged out from guest session" });
+  res.cookie("brain_user_id", "", { maxAge: 0, path: "/" });
+  return res.json({ success: true, message: "Logged out successfully" });
 });
 
 app.post("/api/auth/register", (req, res) => {
-  return res.status(403).json({ error: "Direct account creation and registration has been disabled. Access is granted instantly as an automatic guest." });
+  try {
+    const { name, email, password, confirmPassword, role } = req.body;
+
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ error: "All registration fields are required." });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: "Passwords do not match." });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Please enter a valid email address." });
+    }
+
+    if (password.length < 5) {
+      return res.status(400).json({ error: "Password must be at least 5 characters long." });
+    }
+
+    if (role === "admin") {
+      return res.status(403).json({ error: "Direct registration of administrator accounts is strictly forbidden." });
+    }
+
+    if (!["student", "teacher"].includes(role)) {
+      return res.status(400).json({ error: "Invalid registration profile path selected." });
+    }
+
+    const existingUser = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    if (existingUser) {
+      return res.status(400).json({ error: "This email address is already registered on Swiftstudy." });
+    }
+
+    const newUserId = "usr_" + Math.random().toString(36).substring(2, 9);
+    const hasRegNum = role === "student";
+    
+    // Starting balances preloaded for complementary trial actions (₦25,000 teacher, ₦5,000 student)
+    const startBalance = role === "teacher" ? 25000 : 5000;
+
+    const newUser = {
+      id: newUserId,
+      email: email.toLowerCase().trim(),
+      password: hashPassword(password),
+      name: name.trim(),
+      role: role,
+      walletBalance: startBalance,
+      regNumber: hasRegNum ? `REG/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}` : undefined,
+      classLevel: hasRegNum ? "Senior Secondary Section 3" : undefined,
+      isSuspended: false,
+      createdAt: new Date().toISOString()
+    };
+
+    db.users.push(newUser);
+    saveDatabase();
+
+    res.cookie("brain_user_id", newUserId, {
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      httpOnly: false,
+      path: "/"
+    });
+
+    return res.json({
+      success: true,
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role,
+        regNumber: newUser.regNumber,
+        walletBalance: newUser.walletBalance,
+        classLevel: newUser.classLevel
+      }
+    });
+
+  } catch (err: any) {
+    console.error("Registration error:", err);
+    return res.status(500).json({ error: err.message || "An unexpected error occurred during account creation." });
+  }
 });
 
 app.post("/api/auth/login", (req, res) => {
-  return res.status(403).json({ error: "Credentials and login authentication are disabled. Access is granted instantly as an automatic guest." });
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required." });
+    }
+
+    const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
+    if (!user) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    if (user.isSuspended) {
+      return res.status(403).json({ error: "This academic profile has been suspended by system administrators." });
+    }
+
+    // Verify Password both plaintext (historic migration fallback) and SHA256 hashed
+    const inputHashed = hashPassword(password);
+    const isValid = (user.password === password || user.password === inputHashed);
+
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    res.cookie("brain_user_id", user.id, {
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      httpOnly: false,
+      path: "/"
+    });
+
+    return res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        regNumber: user.regNumber,
+        walletBalance: user.walletBalance,
+        classLevel: user.classLevel,
+        schoolName: user.schoolName,
+        experience: user.experience
+      }
+    });
+
+  } catch (err: any) {
+    console.error("Login endpoint failure:", err);
+    return res.status(500).json({ error: "Server authentication sequence failed." });
+  }
 });
 
 app.post("/api/auth/reset", (req, res) => {
-  return res.status(403).json({ error: "Password reset is disabled as the entire credential system has been retired." });
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email address is required." });
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: "Please enter a valid email address." });
+  }
+  // Mock verification reset
+  return res.json({ success: true, message: `Password reset instruction guidelines logged to ${email}. Check mailbox.` });
 });
 
 app.post("/api/auth/update-profile", (req, res) => {
   const { name } = req.body;
   const authUser = getAuthenticatedUser(req);
+  if (!authUser) {
+    return res.status(401).json({ error: "Authentication status invalid." });
+  }
   if (name) {
     authUser.name = name;
     saveDatabase();
@@ -826,31 +974,30 @@ function getAuthenticatedUser(req: any) {
   if (!db.users) db.users = [];
   
   const cookieHeader = req.headers.cookie || "";
+  let userId: string | null = null;
   const match = cookieHeader.match(/brain_user_id=([^; ]+)/);
-  const userId = match ? match[1] : null;
+  if (match) {
+    userId = match[1];
+  }
+
+  // Support fallback headers from client token states
+  if (!userId) {
+    if (req.headers["x-user-id"]) {
+      userId = req.headers["x-user-id"] as string;
+    } else {
+      const auth = req.headers.authorization || "";
+      if (auth.startsWith("Bearer ")) {
+        userId = auth.substring(7);
+      }
+    }
+  }
   
   if (userId) {
     const user = db.users.find((u) => u.id === userId);
     if (user) return user;
   }
   
-  // Fallback: This guarantees unrestricted public access with full administrative privileges so backend checks never block
-  let guest = db.users.find((u) => u.id === "usr_guest_admin" || u.email === "nwaigboaugust@gmail.com");
-  if (!guest) {
-    guest = {
-      id: "usr_guest_admin",
-      email: "nwaigboaugust@gmail.com",
-      password: "password",
-      name: "Austin Nwaigbo",
-      role: "admin",
-      walletBalance: 50000,
-      isSuspended: false,
-      createdAt: new Date().toISOString()
-    };
-    db.users.push(guest);
-    saveDatabase();
-  }
-  return guest;
+  return null;
 }
 
 // 1. GET ALL DOCUMENTS (Filtered by user, active/trash status, category, search, with pagination)

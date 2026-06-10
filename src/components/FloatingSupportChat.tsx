@@ -31,7 +31,7 @@ export default function FloatingSupportChat() {
       {
         id: "wel_1",
         role: "model",
-        text: "Hi there! I am your Brain Direct AI Assistant 🧠. You can ask me anything about lesson note creations, publishing CBT exams, wallet payments, or write down high-priority complaints. How can I serve your school today?",
+        text: "Hi there! I am your Swiftstudy Direct AI Assistant 🧠. You can ask me anything about lesson note creations, publishing CBT exams, wallet payments, or write down high-priority complaints. How can I serve your school today?",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
       }
     ]);
@@ -82,7 +82,7 @@ export default function FloatingSupportChat() {
           {
             id: "msg_" + Math.random().toString(36).substring(2, 9),
             role: "model",
-            text: data.text || "I am connected! Let me know if there's any other question about Brain you would like answered.",
+            text: data.text || "I am connected! Let me know if there's any other question about Swiftstudy you would like answered.",
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
           }
         ]);
@@ -270,7 +270,7 @@ export default function FloatingSupportChat() {
                   <div className="px-3 py-1.5 bg-violet-50/60 border-t border-b border-violet-100 flex items-center justify-between gap-1.5 shrink-0 text-[10px] text-violet-700 font-bold">
                     <span>Direct:</span>
                     <a
-                      href="https://wa.me/2348062078597?text=Hello%20Brain%20Direct%20Support"
+                      href="https://wa.me/2348062078597?text=Hello%20Swiftstudy%20Direct%20Support"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg hover:bg-emerald-250 transition"
