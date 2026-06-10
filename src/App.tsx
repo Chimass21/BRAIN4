@@ -4,6 +4,7 @@ import LandingPage from './components/LandingPage';
 import StudentDashboard from './components/StudentDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import OnboardingDashboard from './components/OnboardingDashboard';
 import ExamEngine from './components/ExamEngine';
 import FloatingSupportChat from './components/FloatingSupportChat';
 import { Exam } from './types';
@@ -17,6 +18,7 @@ export default function App() {
   const [activeExamStudentName, setActiveExamStudentName] = useState('');
   const [userPerspective, setUserPerspective] = useState<'student' | 'teacher' | 'admin'>('teacher');
   const [guestExamCompleted, setGuestExamCompleted] = useState<{ studentName: string; examTitle: string } | null>(null);
+  const [onboardingTriggerVal, setOnboardingTriggerVal] = useState(0);
   
   // Security checking states for CBT attempts & standard 50 Naira gate charge
   const [candidateAuthError, setCandidateAuthError] = useState('');
@@ -336,6 +338,33 @@ export default function App() {
       role: userPerspective,
     };
 
+    // Dynamically check onboarding completed for the current user and perspective
+    const isPerspectiveOnboarded = 
+      userPerspective === 'admin' || 
+      localStorage.getItem(`brain_onboarded_${userPerspective}_${currentUser.id}`) === 'true';
+
+    if (!isPerspectiveOnboarded) {
+      return (
+        <OnboardingDashboard
+          user={currentUser}
+          role={userPerspective}
+          onComplete={(updatedData) => {
+            // Save on-boarded marker
+            localStorage.setItem(`brain_onboarded_${userPerspective}_${currentUser.id}`, 'true');
+            // Merge onboarding academic data into profile
+            const updatedUser = {
+              ...currentUser,
+              ...updatedData
+            };
+            setCurrentUser(updatedUser);
+            localStorage.setItem('brain_guest_user', JSON.stringify(updatedUser));
+            // Trigger local state re-evaluation
+            setOnboardingTriggerVal(prev => prev + 1);
+          }}
+        />
+      );
+    }
+
     return (
       <div className="min-h-screen flex flex-col bg-slate-50">
         {/* Integrated Dual/Triple-Perspective Switcher Header */}
@@ -382,20 +411,22 @@ export default function App() {
               >
                 Teachers Portal
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setUserPerspective('admin');
-                  localStorage.setItem('brain_perspective', 'admin');
-                }}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-black tracking-wide transition-all ease-out duration-150 cursor-pointer ${
-                  userPerspective === 'admin'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/20'
-                }`}
-              >
-                Admin System
-              </button>
+              {currentUser?.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserPerspective('admin');
+                    localStorage.setItem('brain_perspective', 'admin');
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-black tracking-wide transition-all ease-out duration-150 cursor-pointer ${
+                    userPerspective === 'admin'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/20'
+                  }`}
+                >
+                  Admin System
+                </button>
+              )}
             </div>
           </div>
         </div>
