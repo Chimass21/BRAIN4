@@ -803,6 +803,10 @@ app.post("/api/auth/logout", (req, res) => {
 
 app.post("/api/auth/register", (req, res) => {
   try {
+    if (!req.body) {
+      return res.status(400).json({ error: "Standard registration request payload is missing." });
+    }
+
     const { name, email, password, confirmPassword, role } = req.body;
 
     if (!name || !email || !password || !role) {

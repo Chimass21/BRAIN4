@@ -34,18 +34,21 @@ try {
 
     if (isApiCall) {
       const currentHost = window.location.hostname;
-      // Standard environments: Cloud Run, localhost dev, and Netlify itself
+      // Standard environments: Cloud Run, localhost dev, and local Google system web views/previews
       const isStandardEnvironment = 
         currentHost.includes(".run.app") || 
         currentHost.includes("localhost") || 
         currentHost.includes("127.0.0.1") ||
-        currentHost.includes("netlify.app") ||
+        currentHost.includes(".google.com") ||
+        currentHost.includes(".google") ||
+        currentHost.includes("googleusercontent.com") ||
         currentHost === "localhost" ||
         currentHost === "127.0.0.1";
 
       if (!isStandardEnvironment) {
         // Direct all relative Netlify api endpoints to our production Cloud Run engine fallback
         const backendUrl = "https://ais-pre-ztyvz4czqqphjogv3uekw5-210258902427.europe-west1.run.app";
+        const oldUrl = url;
         if (isAbsolute) {
           try {
             const parsed = new URL(url);
@@ -56,6 +59,7 @@ try {
         } else {
           url = `${backendUrl}${url}`;
         }
+        console.warn(`[API Proxy Redirect] Client hostname "${currentHost}" is non-standard. Rewrote API call: "${oldUrl}" -> "${url}"`);
       }
     }
 

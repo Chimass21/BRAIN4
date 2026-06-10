@@ -192,7 +192,31 @@ export default function App() {
         }, 1200);
       }
     } catch (err: any) {
-      setAuthError(err.message || 'Verification failed. Try again.');
+      console.group('--- AUTHENTICATION/REGISTRATION FAILURE DIAGNOSTICS ---');
+      console.error('Error message:', err.message);
+      console.error('Error stack:', err.stack || err);
+      console.error('Auth action tab:', authTab);
+      console.error('Current window.location.origin:', window.location.origin);
+      console.error('Current window.location.host:', window.location.host);
+      console.error('Payload role selection:', authTab === 'register' ? registerRole : 'N/A');
+      console.error('API endpoint path:', authTab === 'register' ? '/api/auth/register' : '/api/auth/login');
+      
+      const isFailedToFetch = err.message && err.message.toLowerCase().includes('failed to fetch');
+      if (isFailedToFetch) {
+        console.error('Failed to fetch indicates a network level or CORS policy error before the server could send headers.');
+        console.error('Diagnostics checklist:');
+        console.error('1. Check if the backend on port 3000 crashed. Run restart_dev_server if needed.');
+        console.error('2. Confirm if modern browser security blocked cross-origin routing.');
+        console.error('3. Check if server response handles preflight OPTIONS requests.');
+        console.groupEnd();
+        
+        setAuthError(
+          'Network Connection Issue (failed to fetch). This typically indicates that you are in a non-standard preview client environment, the API server on port 3000 has been paused/restarted, or a cross-origin CORS policy request was blocked. Please check your browser developer tools console (F12) for detailed logs, and try reloading the page.'
+        );
+      } else {
+        console.groupEnd();
+        setAuthError(err.message || 'Verification failed. Try again.');
+      }
     } finally {
       setAuthLoading(false);
     }
