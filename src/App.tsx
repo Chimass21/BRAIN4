@@ -175,7 +175,15 @@ export default function App() {
           body: JSON.stringify(payload)
         });
 
-        const data = await response.json();
+        let data: any;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          const text = await response.text();
+          throw new Error(text.slice(0, 100) || 'Unable to parse registration response on server.');
+        }
+
         if (!response.ok) {
           throw new Error(data.error || 'Unable to create account. Please try again.');
         }
@@ -201,7 +209,15 @@ export default function App() {
           body: JSON.stringify(payload)
         });
 
-        const data = await response.json();
+        let data: any;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          const text = await response.text();
+          throw new Error(text.slice(0, 100) || 'Unable to parse login response on server.');
+        }
+
         if (!response.ok) {
           throw new Error(data.error || 'Failed to authenticate.');
         }
@@ -229,7 +245,7 @@ export default function App() {
         console.error('Failed to fetch indicates a network level or CORS policy error.');
         console.groupEnd();
         setAuthError(
-          'Email already exists or connection is offline. Please try again.'
+          'Unable to reach server. Please check your internet connection or reload the page and try again.'
         );
       } else {
         console.groupEnd();
