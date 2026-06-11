@@ -905,30 +905,39 @@ app.post("/api/auth/register", async (req, res) => {
     // --- INTEGRATING SUPABASE AUTHENTICATION ---
     if (supabase) {
       console.log(`[Supabase Auth] Attempting signup via GoTrue client API for: ${email}`);
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.toLowerCase().trim(),
-        password: password,
-        options: {
-          data: {
-            name: name.trim(),
-            role: role,
-            classLevel: role === "student" ? "Senior Secondary Section 3" : undefined,
+      try {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: email.toLowerCase().trim(),
+          password: password,
+          options: {
+            data: {
+              name: name.trim(),
+              role: role,
+              classLevel: role === "student" ? "Senior Secondary Section 3" : undefined,
+            }
           }
-        }
-      });
-
-      if (authError) {
-        console.error("[Supabase Auth Signup Error] GoTrue API registration failed:", authError.message, authError);
-        return res.status(400).json({ 
-          error: `Supabase Authentication Error: ${authError.message}. Code: (${authError.status || 'UNKNOWN'})`
         });
-      }
 
-      if (authData && authData.user) {
-        resolvedUserId = authData.user.id;
-        console.log(`[Supabase Auth Signup Succeeded] Created user ID: ${resolvedUserId}`);
-      } else {
-        console.warn("[Supabase Auth Signup Warning] Succeeded but returned no user object.");
+        if (authError) {
+          console.error("[Supabase Auth Signup Error] GoTrue API registration failed:", authError.message, authError);
+          
+          let friendlyError = `Supabase Authentication Error: ${authError.message}.`;
+          if (authError.message && authError.message.includes("FUNCTION_INVOCATION_FAILED")) {
+            friendlyError = `Supabase error: "FUNCTION_INVOCATION_FAILED". This happens when a broken Database Webhook trigger (like 'supabase_functions') remains on the auth.users table in your Supabase Dashboard. Please run the SQL statements inside the /supabase_trigger.sql file in your Supabase SQL Editor to clean and fix this!`;
+          }
+          
+          return res.status(400).json({ error: friendlyError });
+        }
+
+        if (authData && authData.user) {
+          resolvedUserId = authData.user.id;
+          console.log(`[Supabase Auth Signup Succeeded] Created user ID: ${resolvedUserId}`);
+        } else {
+          console.warn("[Supabase Auth Signup Warning] Succeeded but returned no user object.");
+        }
+      } catch (err: any) {
+        console.error("[Supabase Auth Signup Crash]:", err);
+        return res.status(500).json({ error: `Supabase Authentication SDK crashed: ${err.message || err}` });
       }
     } else {
       console.warn("[Register Warning] Supabase client is not initialized. Falling back to local offline user mock mode.");
