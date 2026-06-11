@@ -377,11 +377,18 @@ async function loadDatabaseFromSupabase(): Promise<void> {
 
   activeHydrationPromise = (async () => {
     try {
-      const { data: row, error } = await supabase
+      const fetchPromise = supabase
         .from("brain_state")
         .select("data")
         .eq("id", "primary_state")
         .maybeSingle();
+
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error("Supabase read operation timed out (2000ms limit)")), 2000)
+      );
+
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+      const { data: row, error } = response || { data: null, error: null };
 
       if (error) {
         console.warn("Failed to fetch database state from Supabase, error message:", error.message);
@@ -435,8 +442,8 @@ async function loadDatabaseFromSupabase(): Promise<void> {
         await saveDatabaseToSupabase();
         lastHydratedAt = Date.now();
       }
-    } catch (err) {
-      console.error("Critical error loading database from Supabase:", err);
+    } catch (err: any) {
+      console.error("Critical error loading database from Supabase:", err?.message || err);
     } finally {
       activeHydrationPromise = null;
     }
@@ -448,13 +455,21 @@ async function loadDatabaseFromSupabase(): Promise<void> {
 async function saveDatabaseToSupabase() {
   if (!supabase) return;
   try {
-    const { error } = await supabase
+    const upsertPromise = supabase
       .from("brain_state")
       .upsert({
         id: "primary_state",
         data: db,
         updated_at: new Date().toISOString()
       });
+
+    const timeoutPromise = new Promise<any>((_, reject) =>
+      setTimeout(() => reject(new Error("Supabase write operation timed out (2000ms limit)")), 2000)
+    );
+
+    const response = await Promise.race([upsertPromise, timeoutPromise]);
+    const { error } = response || { error: null };
+
     if (error) {
       console.error("Failed to persist database state to Supabase:", error.message);
       if (error.message && error.message.toLowerCase().includes("relation") && error.message.toLowerCase().includes("does not exist")) {
@@ -468,8 +483,8 @@ async function saveDatabaseToSupabase() {
     } else {
       console.log("Successfully persisted state to Supabase!");
     }
-  } catch (err) {
-    console.error("Critical error saving database to Supabase:", err);
+  } catch (err: any) {
+    console.error("Critical error saving database to Supabase:", err?.message || err);
   }
 }
 
