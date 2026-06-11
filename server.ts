@@ -847,56 +847,99 @@ app.post("/api/auth/logout", (req, res) => {
   return res.json({ success: true, message: "Logged out successfully" });
 });
 
-app.post("/api/auth/register", (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
+  console.log("=== [REGISTRATION ENDPOINT TRIGGERED] ===");
   try {
     if (!req.body) {
+      console.error("[Register Error] Missing payload");
       return res.status(400).json({ error: "Standard registration request payload is missing." });
     }
 
     const { name, email, password, confirmPassword, role } = req.body;
+    console.log(`[Register Request] Name: "${name}", Email: "${email}", Role: "${role}"`);
 
     if (!name || name.trim().length < 2) {
+      console.error("[Register Error] Invalid name length");
       return res.status(400).json({ error: "Unable to create account. Please enter a valid name of at least 2 characters." });
     }
 
     if (!email) {
+      console.error("[Register Error] Email is missing");
       return res.status(400).json({ error: "Invalid email." });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
+      console.error(`[Register Error] Email "${email}" does not match regex`);
       return res.status(400).json({ error: "Invalid email." });
     }
 
     if (!password || password.length < 8) {
+      console.error("[Register Error] Password is too short");
       return res.status(400).json({ error: "Password must be at least 8 characters." });
     }
 
     if (password !== confirmPassword) {
+      console.error("[Register Error] Passwords do not match");
       return res.status(400).json({ error: "Passwords do not match." });
     }
 
     if (role === "admin") {
+      console.error("[Register Error] Attempted direct admin registration");
       return res.status(403).json({ error: "Direct registration of administrator accounts is strictly forbidden." });
     }
 
     if (!["student", "teacher"].includes(role)) {
+      console.error(`[Register Error] Invalid role selection: "${role}"`);
       return res.status(400).json({ error: "Invalid registration profile path selected." });
     }
 
     const existingUser = db.users.find(u => u && u.email && u.email.toLowerCase() === email.toLowerCase().trim());
     if (existingUser) {
+      console.warn(`[Register Warning] Email "${email}" already exists in local database cache`);
       return res.status(400).json({ error: "Email already exists." });
     }
 
-    const newUserId = "usr_" + Math.random().toString(36).substring(2, 9);
-    const hasRegNum = role === "student";
+    let resolvedUserId = "usr_" + Math.random().toString(36).substring(2, 9);
     
+    // --- INTEGRATING SUPABASE AUTHENTICATION ---
+    if (supabase) {
+      console.log(`[Supabase Auth] Attempting signup via GoTrue client API for: ${email}`);
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email.toLowerCase().trim(),
+        password: password,
+        options: {
+          data: {
+            name: name.trim(),
+            role: role,
+            classLevel: role === "student" ? "Senior Secondary Section 3" : undefined,
+          }
+        }
+      });
+
+      if (authError) {
+        console.error("[Supabase Auth Signup Error] GoTrue API registration failed:", authError.message, authError);
+        return res.status(400).json({ 
+          error: `Supabase Authentication Error: ${authError.message}. Code: (${authError.status || 'UNKNOWN'})`
+        });
+      }
+
+      if (authData && authData.user) {
+        resolvedUserId = authData.user.id;
+        console.log(`[Supabase Auth Signup Succeeded] Created user ID: ${resolvedUserId}`);
+      } else {
+        console.warn("[Supabase Auth Signup Warning] Succeeded but returned no user object.");
+      }
+    } else {
+      console.warn("[Register Warning] Supabase client is not initialized. Falling back to local offline user mock mode.");
+    }
+
+    const hasRegNum = role === "student";
     // Starting balances preloaded for complementary trial actions (₦25,000 teacher, ₦5,000 student)
     const startBalance = role === "teacher" ? 25000 : 5000;
 
     const newUser = {
-      id: newUserId,
+      id: resolvedUserId,
       email: email.toLowerCase().trim(),
       password: hashPassword(password),
       name: name.trim(),
@@ -910,8 +953,9 @@ app.post("/api/auth/register", (req, res) => {
 
     db.users.push(newUser);
     saveDatabase();
+    console.log(`[Register Success] Registered ${email} with ID ${newUser.id} inside cached memory database.`);
 
-    res.cookie("brain_user_id", newUserId, {
+    res.cookie("brain_user_id", newUser.id, {
       maxAge: 30 * 24 * 60 * 60 * 1000,
       httpOnly: false,
       path: "/"
@@ -931,44 +975,81 @@ app.post("/api/auth/register", (req, res) => {
     });
 
   } catch (err: any) {
-    console.error("Registration error:", err);
-    return res.status(500).json({ error: "Unable to create account. Please try again." });
+    console.error("Critical Registration endpoint failure:", err);
+    return res.status(500).json({ error: `Unable to create account. Server error: ${err.message || err}` });
   }
 });
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
+  console.log("=== [LOGIN ENDPOINT TRIGGERED] ===");
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
+      console.error("[Login Error] Email or password missing");
       return res.status(400).json({ error: "Email and password are required." });
     }
 
-    const matchedUsers = db.users.filter(u => u && u.email && u.email.toLowerCase() === email.toLowerCase().trim());
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log(`[Login Attempt] Email: "${normalizedEmail}"`);
+
+    // --- INTEGRATING SUPABASE AUTHENTICATION ---
+    let supabaseUserAuthenticated = false;
+    let reconciledUserId: string | null = null;
+
+    if (supabase) {
+      console.log(`[Supabase Auth] Verifying credentials via GoTrue signInWithPassword for: ${normalizedEmail}`);
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: password
+      });
+
+      if (authError) {
+        console.warn(`[Supabase Auth Login Warning] GoTrue authentication failed for ${normalizedEmail}. Message:`, authError.message);
+        // We do NOT block immediately yet. If it's a seed user who does not exist in Supabase auth yet, we'll fall back to our local hash password check.
+      } else if (authData && authData.user) {
+        supabaseUserAuthenticated = true;
+        reconciledUserId = authData.user.id;
+        console.log(`[Supabase Auth Login Succeeded] Authenticated successfully with UUID: ${reconciledUserId}`);
+      }
+    }
+
+    const matchedUsers = db.users.filter(u => u && u.email && u.email.toLowerCase() === normalizedEmail);
     if (matchedUsers.length === 0) {
+      console.error(`[Login Error] No registered cached user found for email: ${normalizedEmail}`);
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
-    // Since the database supports multiple accounts under the same email with different passwords/roles
-    // (e.g. nwaigboaugust@gmail.com which preloads admin, teacher, and student), we look for a user matching the login password
-    const inputHashed = hashPassword(password);
-    let user = matchedUsers.find(u => u && (u.password === password || u.password === inputHashed));
+    // Attempt to match the exact user.
+    // If we authenticated successfully with Supabase, we match by Supabase ID first.
+    let user = matchedUsers.find(u => u && (u.id === reconciledUserId));
+    
+    // Otherwise fallback to custom password hash matching
+    if (!user) {
+      const inputHashed = hashPassword(password);
+      user = matchedUsers.find(u => u && (u.password === password || u.password === inputHashed));
+    }
 
-    // Fallback to the first matched user if none of the passwords match, enabling proper standard password validity response
+    // Final fallback to the first matched user if none of the passwords match
     if (!user) {
       user = matchedUsers[0];
     }
 
     if (user.isSuspended) {
+      console.warn(`[Login Warning] User ${user.email} is suspended`);
       return res.status(403).json({ error: "This academic profile has been suspended by system administrators." });
     }
 
-    // Verify Password both plaintext (historic migration fallback) and SHA256 hashed
-    const isValid = (user.password === password || user.password === inputHashed);
+    // Verify Password both plaintext (historic migration fallback), SHA256 hashed, or via Supabase verification
+    const inputHashed = hashPassword(password);
+    const isValid = supabaseUserAuthenticated || (user.password === password || user.password === inputHashed);
 
     if (!isValid) {
+      console.error(`[Login Error] Invalid password entered for user: ${user.email}`);
       return res.status(401).json({ error: "Invalid email or password." });
     }
+
+    console.log(`[Login Success] User ${user.email} logged in successfully with custom cache ID ${user.id}`);
 
     res.cookie("brain_user_id", user.id, {
       maxAge: 30 * 24 * 60 * 60 * 1000,
@@ -993,7 +1074,7 @@ app.post("/api/auth/login", (req, res) => {
 
   } catch (err: any) {
     console.error("Login endpoint failure:", err);
-    return res.status(500).json({ error: "Server authentication sequence failed." });
+    return res.status(500).json({ error: `Server authentication sequence failed: ${err.message || err}` });
   }
 });
 
