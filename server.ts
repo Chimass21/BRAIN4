@@ -2995,8 +2995,8 @@ async function startServer() {
   });
 }
 
-// Only start the server automatically if we are not running on Netlify Functions
-if (!process.env.NETLIFY) {
+// Only start the server automatically if we are not running on a serverless platform
+if (!IS_SERVERLESS) {
   startServer();
 }
 
