@@ -377,17 +377,31 @@ async function loadDatabaseFromSupabase(): Promise<void> {
 
   activeHydrationPromise = (async () => {
     try {
-      const fetchPromise = supabase
-        .from("brain_state")
-        .select("data")
-        .eq("id", "primary_state")
-        .maybeSingle();
+      let timeoutId: any;
+      const timeoutPromise = new Promise<any>((resolve) => {
+        timeoutId = setTimeout(() => resolve({ timeout: true }), 2000);
+      });
 
-      const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error("Supabase read operation timed out (2000ms limit)")), 2000)
-      );
+      const fetchPromise = (async () => {
+        try {
+          return await supabase
+            .from("brain_state")
+            .select("data")
+            .eq("id", "primary_state")
+            .maybeSingle();
+        } catch (err: any) {
+          return { error: err };
+        }
+      })();
 
       const response = await Promise.race([fetchPromise, timeoutPromise]);
+      clearTimeout(timeoutId);
+
+      if (response && response.timeout) {
+        console.warn("Supabase read operation timed out (2000ms limit)");
+        return;
+      }
+
       const { data: row, error } = response || { data: null, error: null };
 
       if (error) {
@@ -455,19 +469,33 @@ async function loadDatabaseFromSupabase(): Promise<void> {
 async function saveDatabaseToSupabase() {
   if (!supabase) return;
   try {
-    const upsertPromise = supabase
-      .from("brain_state")
-      .upsert({
-        id: "primary_state",
-        data: db,
-        updated_at: new Date().toISOString()
-      });
+    let timeoutId: any;
+    const timeoutPromise = new Promise<any>((resolve) => {
+      timeoutId = setTimeout(() => resolve({ timeout: true }), 2000);
+    });
 
-    const timeoutPromise = new Promise<any>((_, reject) =>
-      setTimeout(() => reject(new Error("Supabase write operation timed out (2000ms limit)")), 2000)
-    );
+    const upsertPromise = (async () => {
+      try {
+        return await supabase
+          .from("brain_state")
+          .upsert({
+            id: "primary_state",
+            data: db,
+            updated_at: new Date().toISOString()
+          });
+      } catch (err: any) {
+        return { error: err };
+      }
+    })();
 
     const response = await Promise.race([upsertPromise, timeoutPromise]);
+    clearTimeout(timeoutId);
+
+    if (response && response.timeout) {
+      console.warn("Supabase write operation timed out (2000ms limit)");
+      return;
+    }
+
     const { error } = response || { error: null };
 
     if (error) {
@@ -538,6 +566,10 @@ function loadDatabase() {
 
 function saveDatabase() {
   try {
+    const dir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
   } catch (error) {
     console.error("Critical: Failed to save database changes to disk!", error);
