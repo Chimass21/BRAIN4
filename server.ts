@@ -140,16 +140,17 @@ app.use(async (req, res, next) => {
   next();
 });
 
+const IS_SERVERLESS = !!(process.env.NETLIFY || process.env.VERCEL || process.env.NOW_REGION || process.env.AWS_LAMBDA_FUNCTION_NAME);
 const REPO_DB_PATH = path.join(process.cwd(), "brain_db.json");
-const DB_PATH = process.env.NETLIFY
+const DB_PATH = IS_SERVERLESS
   ? path.join("/tmp", "brain_db.json")
   : REPO_DB_PATH;
 
-// If on Netlify, copy the repository base database to the writable /tmp folder on startup
-if (process.env.NETLIFY && !fs.existsSync(DB_PATH) && fs.existsSync(REPO_DB_PATH)) {
+// If on a serverless platform, copy the repository base database to the writable /tmp folder on startup
+if (IS_SERVERLESS && !fs.existsSync(DB_PATH) && fs.existsSync(REPO_DB_PATH)) {
   try {
     fs.copyFileSync(REPO_DB_PATH, DB_PATH);
-    console.log("Successfully copied seed database to writable /tmp/brain_db.json");
+    console.log("Successfully copied seed database to writable /tmp/brain_db.json for serverless startup");
   } catch (err) {
     console.error("Failed to copy seed database to /tmp", err);
   }
