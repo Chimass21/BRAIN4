@@ -234,21 +234,23 @@ function generateRegistrationNumber(): string {
   while (!isUnique) {
     const number = Math.floor(1000 + Math.random() * 9000);
     regStr = `REG/${currentYear}/${number}`;
-    isUnique = !db.users.some(u => u.regNumber === regStr);
+    isUnique = !db.users.some(u => u && u.regNumber === regStr);
   }
   return regStr;
 }
 
 function ensureStudentRegNumbers() {
   let modified = false;
-  db.users.forEach((u, i) => {
-    if (u.role === "student") {
-      if (!u.regNumber) {
-        u.regNumber = `REG/${new Date().getFullYear()}/${2000 + i}`;
-        modified = true;
+  if (db && db.users) {
+    db.users.forEach((u, i) => {
+      if (u && u.role === "student") {
+        if (!u.regNumber) {
+          u.regNumber = `REG/${new Date().getFullYear()}/${2000 + i}`;
+          modified = true;
+        }
       }
-    }
-  });
+    });
+  }
   if (modified) {
     saveDatabase();
   }
@@ -834,7 +836,7 @@ app.post("/api/auth/register", (req, res) => {
       return res.status(400).json({ error: "Invalid registration profile path selected." });
     }
 
-    const existingUser = db.users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
+    const existingUser = db.users.find(u => u && u.email && u.email.toLowerCase() === email.toLowerCase().trim());
     if (existingUser) {
       return res.status(400).json({ error: "Email already exists." });
     }
@@ -894,9 +896,19 @@ app.post("/api/auth/login", (req, res) => {
       return res.status(400).json({ error: "Email and password are required." });
     }
 
-    const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
-    if (!user) {
+    const matchedUsers = db.users.filter(u => u && u.email && u.email.toLowerCase() === email.toLowerCase().trim());
+    if (matchedUsers.length === 0) {
       return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    // Since the database supports multiple accounts under the same email with different passwords/roles
+    // (e.g. nwaigboaugust@gmail.com which preloads admin, teacher, and student), we look for a user matching the login password
+    const inputHashed = hashPassword(password);
+    let user = matchedUsers.find(u => u && (u.password === password || u.password === inputHashed));
+
+    // Fallback to the first matched user if none of the passwords match, enabling proper standard password validity response
+    if (!user) {
+      user = matchedUsers[0];
     }
 
     if (user.isSuspended) {
@@ -904,7 +916,6 @@ app.post("/api/auth/login", (req, res) => {
     }
 
     // Verify Password both plaintext (historic migration fallback) and SHA256 hashed
-    const inputHashed = hashPassword(password);
     const isValid = (user.password === password || user.password === inputHashed);
 
     if (!isValid) {
@@ -997,7 +1008,7 @@ function getAuthenticatedUser(req: any) {
   }
   
   if (userId) {
-    const user = db.users.find((u) => u.id === userId);
+    const user = db.users.find((u) => u && u.id === userId);
     if (user) return user;
   }
   
@@ -2318,8 +2329,8 @@ app.get("/api/transactions/user/:userId", (req, res) => {
 
 // --- ADMIN PANEL API ENDPOINTS ---
 app.get("/api/admin/stats", (req, res) => {
-  const teacherCount = db.users.filter((u) => u.role === "teacher").length;
-  const studentCount = db.users.filter((u) => u.role === "student").length;
+  const teacherCount = db.users.filter((u) => u && u.role === "teacher").length;
+  const studentCount = db.users.filter((u) => u && u.role === "student").length;
   const examCount = db.exams.length;
   const resultCount = db.results.length;
   const questionCount = db.exams.reduce((sum, e) => sum + (e.questions?.length || 0), 0);
@@ -2338,7 +2349,7 @@ app.get("/api/admin/stats", (req, res) => {
       questionCount,
       totalPayments,
     },
-    users: db.users.map((u) => ({ 
+    users: db.users.filter(u => u).map((u) => ({ 
       id: u.id, 
       name: u.name, 
       email: u.email, 
