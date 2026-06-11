@@ -12,7 +12,7 @@ let SUPABASE_URL = (
   process.env.SUPABASE_PROJECT_URL || 
   process.env.VITE_SUPABASE_URL || 
   process.env.NEXT_PUBLIC_SUPABASE_URL || 
-  ""
+  "https://mgbtbbskwulsfhoqikdt.supabase.co"
 ).trim();
 
 if (SUPABASE_URL && SUPABASE_URL.endsWith("/")) {
@@ -29,7 +29,7 @@ const SUPABASE_ANON_KEY = (
   process.env.SUPABASE_ANON || 
   process.env.VITE_SUPABASE_ANON_KEY || 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
-  ""
+  "sb_publishable_LOEg-t1W9kUOaeRBwRbjaQ_36fsAAPM"
 ).trim();
 
 let supabase: any = null;
