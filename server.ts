@@ -2580,6 +2580,10 @@ app.get("/api/teachers/:teacherId/lesson-notes", (req, res) => {
   res.json({ lessonNotes: notes });
 });
 
+app.get("/api/lesson-notes", (req, res) => {
+  res.json({ success: true, lessonNotes: db.lessonNotes || [] });
+});
+
 // --- SCHOOL CONFIG & REPORT SHEETS API ---
 
 app.get("/api/school-config", (req, res) => {

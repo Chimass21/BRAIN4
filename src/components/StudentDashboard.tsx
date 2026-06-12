@@ -19,7 +19,7 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
   const [exams, setExams] = useState<Exam[]>([]);
   const [allExams, setAllExams] = useState<Exam[]>([]);
   const [results, setResults] = useState<ExamResult[]>([]);
-  const [activeTab, setActiveTab] = useState<"exams" | "report_card" | "results" | "practice" | "notifications" | "library" | "scheme">("exams");
+  const [activeTab, setActiveTab] = useState<"exams" | "report_card" | "results" | "practice" | "notifications" | "library" | "scheme" | "lesson_notes">("exams");
   const [loading, setLoading] = useState(false);
   const [reportSheets, setReportSheets] = useState<any[]>([]);
   const [localSelectedTerm, setLocalSelectedTerm] = useState("First Term");
@@ -405,6 +405,76 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
   // Search filter
   const [searchQuery, setSearchQuery] = useState("");
 
+  // --- STUDENT LESSON NOTES & CBT PREP STATES ---
+  const [studentNotes, setStudentNotes] = useState<any[]>([]);
+  const [selectedSubjForNotes, setSelectedSubjForNotes] = useState("Mathematics");
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  
+  // Note Generation States
+  const [showNoteGenForm, setShowNoteGenForm] = useState(false);
+  const [noteGenTopic, setNoteGenTopic] = useState("");
+  const [noteGenSubTopic, setNoteGenSubTopic] = useState("");
+  const [noteGenClassLevel, setNoteGenClassLevel] = useState(user.classLevel || "Senior Secondary Section 3");
+  const [isGeneratingNoteText, setIsGeneratingNoteText] = useState(false);
+  const [noteGenError, setNoteGenError] = useState("");
+
+  // CBT Adaptation States
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [cbtConfigQuestionsCount, setCbtConfigQuestionsCount] = useState(10);
+  const [cbtConfigDifficulty, setCbtConfigDifficulty] = useState("Medium");
+  const [showCbtConfig, setShowCbtConfig] = useState(false);
+  
+  // Active CBT States
+  const [cbtActive, setCbtActive] = useState(false);
+  const [cbtQuestions, setCbtQuestions] = useState<any[]>([]);
+  const [cbtCurrentQIdx, setCbtCurrentQIdx] = useState(0);
+  const [cbtAnswers, setCbtAnswers] = useState<{ [key: number]: string }>({});
+  const [cbtTimer, setCbtTimer] = useState(0);
+  const [cbtDuration, setCbtDuration] = useState(10); // in minutes
+  const [cbtFinished, setCbtFinished] = useState(false);
+  const [cbtScore, setCbtScore] = useState(0);
+
+  // CBT Countdown Timer Effect
+  useEffect(() => {
+    let interval: any = null;
+    if (cbtActive && !cbtFinished && cbtTimer > 0) {
+      interval = setInterval(() => {
+        setCbtTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            // Auto submit
+            let score = 0;
+            cbtQuestions.forEach((q, index) => {
+              const studentAns = cbtAnswers[index];
+              if (studentAns && studentAns.trim().toUpperCase() === q.correctAnswer.trim().toUpperCase()) {
+                score++;
+              }
+            });
+            setCbtScore(score);
+            setCbtFinished(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [cbtActive, cbtFinished, cbtTimer, cbtQuestions, cbtAnswers]);
+
+  const handleCbtSubmit = () => {
+    let score = 0;
+    cbtQuestions.forEach((q, index) => {
+      const studentAns = cbtAnswers[index];
+      if (studentAns && studentAns.trim().toUpperCase() === q.correctAnswer.trim().toUpperCase()) {
+        score++;
+      }
+    });
+    setCbtScore(score);
+    setCbtFinished(true);
+  };
+
   const fetchStudentData = async () => {
     setLoading(true);
     try {
@@ -452,6 +522,19 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
         }
       } catch (err) {
         console.error("Subjects list fetching error:", err);
+      }
+
+      // 6. Fetch lesson notes
+      try {
+        const notesRes = await fetch("/api/lesson-notes");
+        if (notesRes.ok) {
+          const notesData = await notesRes.json();
+          if (notesData.success && notesData.lessonNotes) {
+            setStudentNotes(notesData.lessonNotes);
+          }
+        }
+      } catch (err) {
+        console.error("Lesson notes fetching error:", err);
       }
     } catch (err) {
       console.error("Failed to load student dashboard info:", err);
@@ -556,6 +639,7 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
         <nav className="flex-1 px-4 py-4 space-y-1">
           {[
             { id: "exams", label: "Take CBT exams", icon: <GraduationCap className="w-4 h-4" /> },
+            { id: "lesson_notes", label: "Subject Lesson Notes", icon: <BookOpen className="w-4 h-4" /> },
             { id: "report_card", label: "My Term report card", icon: <FileText className="w-4 h-4" /> },
             { id: "results", label: "Scores and reports", icon: <TrendingUp className="w-4 h-4" /> },
             { id: "practice", label: "Study revision", icon: <Sparkles className="w-4 h-4" /> },
@@ -655,6 +739,7 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                 {activeTab === "exams" && "Take CBT exams"}
+                {activeTab === "lesson_notes" && "Subject Lesson Notes"}
                 {activeTab === "report_card" && "My Terminal report card"}
                 {activeTab === "results" && "Scores and reports"}
                 {activeTab === "practice" && "Study revision"}
@@ -664,6 +749,7 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
               </h1>
               <p className="text-xs text-slate-500 font-medium">
                 {activeTab === "exams" && "Prepare or join ongoing published timed computer-based tests."}
+                {activeTab === "lesson_notes" && "Browse standard detailed lesson notes by subject, study solved calculations, and adapt notes into custom CBT practice exams."}
                 {activeTab === "report_card" && "View your official terminal results, cognitive rankings, and printed progress sheets."}
                 {activeTab === "results" && "Track performance grades, subject progressions, and print certificates."}
                 {activeTab === "practice" && "Generate custom revision drills directly for self-study revision drills. Note: Only educators can create/publish official CBT exams."}
@@ -1838,6 +1924,795 @@ export default function StudentDashboard({ user, onLogout, onTakeExam }: Student
                         </div>
                       )}
                     </div>
+                  )}
+                </motion.div>
+              )}
+
+              {activeTab === "lesson_notes" && (
+                <motion.div
+                  key="lesson_notes"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6"
+                >
+                  {/* Subject Selection Bar */}
+                  {!cbtActive && (
+                    <div className="bg-white p-4 rounded-3xl border border-slate-150 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <div className="flex items-center space-x-2">
+                          <BookOpen className="w-5 h-5 text-indigo-600" />
+                          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Select Subject to Study</h2>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedNoteId(null);
+                            setShowNoteGenForm(!showNoteGenForm);
+                          }}
+                          className="px-4 py-2 bg-indigo-50 hover:bg-teal-50 hover:text-teal-700 text-indigo-700 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1 border-none"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          {showNoteGenForm ? "Browse Lessons" : "Study a New Topic"}
+                        </button>
+                      </div>
+
+                      {/* Scrollbar selecting list of Nigerian SSS subjects */}
+                      <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-200">
+                        {[
+                          "Mathematics",
+                          "English Language",
+                          "Physics",
+                          "Chemistry",
+                          "Biology",
+                          "Economics",
+                          "Computer Studies",
+                          "Civic Education",
+                          "Agricultural Science",
+                          "Government",
+                          "Geography",
+                          "Literature in English"
+                        ].map((subj) => {
+                          const isSelected = selectedSubjForNotes.toLowerCase() === subj.toLowerCase();
+                          return (
+                            <button
+                              key={subj}
+                              onClick={() => {
+                                setSelectedSubjForNotes(subj);
+                                setSelectedNoteId(null);
+                                setShowNoteGenForm(false);
+                              }}
+                              className={`py-2 px-4 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer border ${
+                                isSelected
+                                  ? "bg-indigo-600 text-white border-indigo-700 shadow-sm"
+                                  : "bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200"
+                              }`}
+                            >
+                              {subj}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CBT Game Player View */}
+                  {cbtActive ? (
+                    <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl border border-slate-800 space-y-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-md text-[10px] font-bold">CBT COMPREHENSION EXAM</span>
+                            <span className="text-xs text-indigo-400 capitalize font-semibold">{selectedSubjForNotes} • {cbtConfigDifficulty}</span>
+                          </div>
+                          <h3 className="text-lg font-black text-slate-100">CBT Simulation: {studentNotes.find(n => n.id === selectedNoteId)?.topic || "Lesson Notes Drill"}</h3>
+                        </div>
+
+                        {!cbtFinished && (
+                          <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl border font-mono text-sm font-black tracking-wider ${
+                            cbtTimer < 60 ? "bg-red-500/20 text-red-400 border-red-500/30 animate-pulse" : "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+                          }`}>
+                            <Clock className="w-4 h-4" />
+                            {Math.floor(cbtTimer / 60)}:{(cbtTimer % 60).toString().padStart(2, "0")}
+                          </div>
+                        )}
+                      </div>
+
+                      {cbtFinished ? (
+                        // Finished Scoring Page
+                        <div className="space-y-8 py-4">
+                          <div className="text-center space-y-4">
+                            <Trophy className="w-16 h-16 text-yellow-400 mx-auto animate-bounce" />
+                            <div>
+                              <h4 className="text-2xl font-black text-slate-100">CBT Assessment Submitted!</h4>
+                              <p className="text-xs text-slate-400 mt-1">Direct comprehension score derived strictly from your studied material.</p>
+                            </div>
+
+                            <div className="p-6 bg-slate-800/40 rounded-3xl max-w-sm mx-auto border border-slate-800 space-y-2">
+                              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Your CBT Score</span>
+                              <div className="text-5xl font-extrabold text-cyan-400">{cbtScore} / {cbtQuestions.length}</div>
+                              <div className="text-sm text-slate-300 font-bold">({Math.round((cbtScore / cbtQuestions.length) * 100)}% Match)</div>
+                              
+                              <div className="pt-2 text-xs">
+                                {Math.round((cbtScore / cbtQuestions.length) * 100) >= 90 ? (
+                                  <span className="text-emerald-400 font-black">🎓 Distinction / First Class Scholar! Great study depth!</span>
+                                ) : Math.round((cbtScore / cbtQuestions.length) * 100) >= 70 ? (
+                                  <span className="text-cyan-400 font-black">🌟 Very Good / Merit Level! Highly impressive!</span>
+                                ) : Math.round((cbtScore / cbtQuestions.length) * 100) >= 50 ? (
+                                  <span className="text-yellow-400 font-black">👍 Satisfactory Credit Pass! A little more study helps.</span>
+                                ) : (
+                                  <span className="text-red-400 font-black">🚀 Fair Attempt! Let's revise the notes and re-test!</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-center gap-3">
+                              <button
+                                onClick={() => {
+                                  // Reset and start again
+                                  setCbtAnswers({});
+                                  setCbtCurrentQIdx(0);
+                                  setCbtTimer(cbtDuration * 60);
+                                  setCbtFinished(false);
+                                }}
+                                className="px-5 py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white text-xs font-bold rounded-xl transition cursor-pointer border-none"
+                              >
+                                Re-take CBT Drill
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setCbtActive(false);
+                                  setCbtQuestions([]);
+                                  setCbtFinished(false);
+                                }}
+                                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer border-none"
+                              >
+                                Back to Lesson Note
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Correct Answers Review Pane */}
+                          <div className="space-y-4 pt-6 border-t border-slate-800">
+                            <h5 className="text-sm font-bold text-slate-200 uppercase tracking-wider">Detailed Solved Question Review</h5>
+                            <div className="space-y-4">
+                              {cbtQuestions.map((q, idx) => {
+                                const userAns = cbtAnswers[idx];
+                                const isCorrect = userAns === q.correctAnswer;
+                                return (
+                                  <div key={idx} className="p-5 bg-slate-800/40 rounded-2xl border border-slate-800 space-y-3 text-left">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="space-y-1">
+                                        <span className="text-xs text-indigo-400 font-semibold uppercase tracking-wider">Question {idx + 1} of {cbtQuestions.length}</span>
+                                        <p className="text-sm font-bold text-slate-100" dangerouslySetInnerHTML={{ __html: renderFormattedMath(q.question) }} />
+                                      </div>
+                                      <div>
+                                        {isCorrect ? (
+                                          <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-lg border border-emerald-500/20">Correct</span>
+                                        ) : (
+                                          <span className="px-3 py-1 bg-red-500/10 text-red-400 text-xs font-bold rounded-lg border border-red-500/20">Incorrect</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                                      {["A", "B", "C", "D"].map((opt) => {
+                                        const optText = q[`option${opt}`];
+                                        const isChosen = userAns === opt;
+                                        const isRightObj = q.correctAnswer === opt;
+                                        return (
+                                          <div
+                                            key={opt}
+                                            className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                                              isRightObj
+                                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-250 text-white"
+                                                : isChosen
+                                                ? "bg-red-500/10 border-red-500/30 text-red-200"
+                                                : "bg-[#0b1329] border-slate-800 text-slate-400"
+                                            }`}
+                                          >
+                                            <span className="flex-1">
+                                              <strong className="mr-1">{opt}.</strong> {optText}
+                                            </span>
+                                            {isRightObj && <CheckCircle className="w-3.5 h-3.5 text-emerald-400 whitespace-nowrap" />}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+
+                                    <div className="mt-2 text-xs p-3 bg-indigo-950/40 text-indigo-200 rounded-xl border border-indigo-505/10 leading-relaxed italic border-indigo-900">
+                                      <strong>AI Explanation:</strong> {q.explanation || `The correct answer is Option ${q.correctAnswer}. This completes the core requirements of this concept.`}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        // CBT Test Question Active Display
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                          
+                          {/* Main Question Body */}
+                          <div className="md:col-span-3 space-y-6">
+                            <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 space-y-4">
+                              <div className="flex items-center justify-between text-xs text-indigo-400 font-bold border-b border-slate-900 pb-2">
+                                <span>QUESTION {cbtCurrentQIdx + 1} OF {cbtQuestions.length}</span>
+                                <span>{cbtQuestions[cbtCurrentQIdx]?.marks || 5} MARKS</span>
+                              </div>
+                              <p 
+                                className="text-base font-bold text-slate-100 leading-relaxed"
+                                dangerouslySetInnerHTML={{ __html: renderFormattedMath(cbtQuestions[cbtCurrentQIdx]?.question || "") }}
+                              />
+                            </div>
+
+                            {/* Option selections */}
+                            <div className="space-y-3">
+                              {["A", "B", "C", "D"].map((opt) => {
+                                const optionKey = `option${opt}`;
+                                const optionValue = cbtQuestions[cbtCurrentQIdx]?.[optionKey] || "";
+                                const isSelected = cbtAnswers[cbtCurrentQIdx] === opt;
+                                return (
+                                  <button
+                                    key={opt}
+                                    onClick={() => {
+                                      setCbtAnswers({ ...cbtAnswers, [cbtCurrentQIdx]: opt });
+                                    }}
+                                    className={`w-full p-4 rounded-2xl border transition text-left cursor-pointer flex items-center justify-between ${
+                                      isSelected
+                                        ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/10"
+                                        : "bg-slate-950 hover:bg-slate-900 border-slate-800 text-slate-300"
+                                    }`}
+                                  >
+                                    <span className="text-sm font-semibold">
+                                      <strong className="mr-2 uppercase text-xs p-1 px-2.5 bg-slate-800 rounded-lg text-cyan-400 font-mono inline-block">{opt}</strong> {optionValue}
+                                    </span>
+                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                                      isSelected ? "bg-cyan-400 border-cyan-450 text-slate-950 bg-cyan-300" : "border-slate-600"
+                                    }`}>
+                                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {/* Nav Buttons */}
+                            <div className="flex items-center justify-between pt-4">
+                              <button
+                                disabled={cbtCurrentQIdx === 0}
+                                onClick={() => setCbtCurrentQIdx((prev) => prev - 1)}
+                                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer border-none"
+                              >
+                                Previous Question
+                              </button>
+
+                              {cbtCurrentQIdx === cbtQuestions.length - 1 ? (
+                                <button
+                                  onClick={handleCbtSubmit}
+                                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition shadow-lg shadow-emerald-950 cursor-pointer border-none"
+                                >
+                                  Submit CBT Exam
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => setCbtCurrentQIdx((prev) => prev + 1)}
+                                  className="px-5 py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white text-xs font-bold rounded-xl transition cursor-pointer border-none"
+                                >
+                                  Next Question
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Answers Tracker Grid */}
+                          <div className="space-y-4">
+                            <div className="bg-slate-950 p-5 rounded-3xl border border-slate-800">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Assessment Grid</h4>
+                              <div className="grid grid-cols-5 gap-2">
+                                {cbtQuestions.map((_, idx) => {
+                                  const isAnswered = cbtAnswers[idx] !== undefined;
+                                  const isActive = cbtCurrentQIdx === idx;
+                                  return (
+                                    <button
+                                      key={idx}
+                                      onClick={() => setCbtCurrentQIdx(idx)}
+                                      className={`h-9 rounded-lg font-bold text-xs font-mono flex items-center justify-center transition cursor-pointer border ${
+                                        isActive
+                                          ? "bg-cyan-450 border-cyan-300 text-slate-950 shadow-md shadow-cyan-400/10 bg-cyan-400"
+                                          : isAnswered
+                                          ? "bg-indigo-500/20 border-indigo-500/30 text-indigo-300"
+                                          : "bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700"
+                                      }`}
+                                    >
+                                      {idx + 1}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="p-4 bg-slate-950/30 rounded-2xl border border-slate-800/50 space-y-1.5 text-xs text-slate-400 font-medium">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-cyan-450 bg-cyan-400" />
+                                <span>Current Active Question</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-[#1e293b] border border-indigo-500/30" />
+                                <span>Solved & Saved Answer</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-800" />
+                                <span>Unattempted Question</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : selectedNoteId ? (
+                    // Detailed Note Viewer Column
+                    (() => {
+                      const activeNote = studentNotes.find((n) => n.id === selectedNoteId);
+                      if (!activeNote) return <p className="text-slate-500">Note not found.</p>;
+                      return (
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                          
+                          {/* Study Content Details */}
+                          <div className="lg:col-span-3 space-y-6">
+                            
+                            <div className="p-1 border border-slate-200 bg-white rounded-3xl" id="printable_student_note">
+                              <div className="p-6 sm:p-8 space-y-6">
+                                
+                                {/* School curriculum banner */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-3 border-b border-light pb-4">
+                                  <div>
+                                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-black rounded-lg border border-indigo-150 uppercase tracking-widest text-[9px] mb-1.5 inline-block">SWIFTSTUDY NATIONAL CURRICULUM</span>
+                                    <div className="text-slate-505 font-bold uppercase tracking-wide text-slate-500">Federal Ministry of Education Alignment • NERDC</div>
+                                  </div>
+                                  <div className="sm:text-right text-slate-500">
+                                    <span className="font-extrabold block text-slate-800">{activeNote.classLevel}</span>
+                                    <span>Week {activeNote.week || "1"} • Term Session</span>
+                                  </div>
+                                </div>
+
+                                {/* Main Title */}
+                                <div>
+                                  <h3 className="text-2xl font-black text-slate-900 leading-tight">{activeNote.topic}</h3>
+                                  <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider mt-1">{activeNote.subject} Lesson Note Overview</p>
+                                </div>
+
+                                {/* Main Detailed Note Content */}
+                                <div className="space-y-4 pt-2">
+                                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 font-sans">Classroom Lesson Note Text</h4>
+                                  <div 
+                                    className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800 font-sans space-y-3 p-5 bg-slate-50 rounded-2xl border border-slate-150 border-dashed"
+                                    style={{ fontSize: "11.2pt" }}
+                                    dangerouslySetInnerHTML={{ __html: renderFormattedMath(activeNote.content?.detailedNote || "") }}
+                                  />
+                                </div>
+
+                                {/* Solved Calculation Questions (Mathematics / Physics / Chemistry / Quantitative) */}
+                                {activeNote.content?.examples && activeNote.content?.examples.length > 0 && (
+                                  <div className="space-y-4 pt-4">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 font-sans">
+                                      {/math|physic|chemist|algebra|geometry|arithmetic|calculus|equation/i.test(activeNote.subject)
+                                        ? "10 SOLVED CALCULATION QUESTIONS"
+                                        : "ILLUSTRATIVE PRACTICAL EXAMPLES"}
+                                    </h4>
+                                    
+                                    <div className="grid grid-cols-1 gap-4">
+                                      {activeNote.content.examples.map((ex: string, i: number) => (
+                                        <div key={i} className="p-5 bg-gradient-to-r from-emerald-50/20 to-teal-50/20 border border-emerald-100 rounded-2xl space-y-2">
+                                          <div className="text-xs font-black text-emerald-800 uppercase tracking-wider font-sans">Example Study Case {i + 1}</div>
+                                          <p 
+                                            className="text-xs sm:text-sm font-semibold text-slate-850 leading-relaxed text-slate-800"
+                                            dangerouslySetInnerHTML={{ __html: renderFormattedMath(ex) }}
+                                          />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Evaluation Checkpoint Questions */}
+                                {activeNote.content?.evaluation && activeNote.content.evaluation.length > 0 && (
+                                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 font-sans">Section Evaluation Questions</h4>
+                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-150">
+                                      <ol className="list-decimal list-inside space-y-3.5 text-xs sm:text-sm font-bold text-slate-800 leading-relaxed">
+                                        {activeNote.content.evaluation.map((ev: string, idx: number) => (
+                                          <li key={idx} dangerouslySetInnerHTML={{ __html: renderFormattedMath(ev) }} />
+                                        ))}
+                                      </ol>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Assignments & Takeaways */}
+                                {activeNote.content?.assignment && (
+                                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 font-sans">Homework & Takeaway Task</h4>
+                                    <div className="p-5 bg-amber-50/30 border border-amber-200/60 rounded-2xl">
+                                      <p 
+                                        className="text-xs sm:text-sm font-semibold text-amber-900 leading-relaxed"
+                                        dangerouslySetInnerHTML={{ __html: renderFormattedMath(activeNote.content.assignment) }}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Lesson Conclusion */}
+                                {activeNote.content?.conclusion && (
+                                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 font-sans">Topic Conclusion Point</h4>
+                                    <div className="p-5 bg-indigo-50/10 border border-indigo-100 rounded-2xl">
+                                      <p 
+                                        className="text-xs sm:text-sm font-semibold text-slate-700 leading-relaxed"
+                                        dangerouslySetInnerHTML={{ __html: renderFormattedMath(activeNote.content.conclusion) }}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <button
+                                onClick={() => setSelectedNoteId(null)}
+                                className="px-5 py-2.5 bg-slate-150 hover:bg-slate-200 text-slate-740 text-xs font-bold rounded-xl transition cursor-pointer border-none"
+                              >
+                                ← Back to Lessons
+                              </button>
+                              
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleDownloadPDFDirectly("printable_student_note", `${activeNote.topic} Lesson Study Note`)}
+                                  className="px-5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition cursor-pointer inline-flex items-center gap-1.5 border-none"
+                                >
+                                  <Printer className="w-3.5 h-3.5" strokeWidth={3} />
+                                  Download PDF / Print
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Adapt to CBT trigger block sidebar */}
+                          <div className="space-y-6">
+                            
+                            {/* CBT Promotion Dashboard card */}
+                            <div className="p-6 bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-3xl border border-indigo-950 shadow-lg space-y-4">
+                              <div className="flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-cyan-400 animate-pulse" />
+                                <h4 className="text-sm font-black text-slate-100">Adapt Note to CBT</h4>
+                              </div>
+                              <p className="text-xs text-indigo-200 leading-relaxed font-semibold">
+                                Adapt this standard NERDC lesson note study guide into an active Computer-Based Test (CBT)!
+                              </p>
+                              
+                              <div className="space-y-3 pt-2 text-slate-900">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] uppercase font-bold text-indigo-300">Question Count</label>
+                                  <select
+                                    value={cbtConfigQuestionsCount}
+                                    onChange={(ev) => setCbtConfigQuestionsCount(Number(ev.target.value))}
+                                    className="w-full bg-slate-950 border border-indigo-800 text-white p-2.5 text-xs rounded-xl focus:border-cyan-400 outline-none"
+                                  >
+                                    <option value={5}>5 Questions Quiz</option>
+                                    <option value={10}>10 Questions Practice</option>
+                                    <option value={15}>15 Question Exam Prep</option>
+                                  </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[10px] uppercase font-bold text-indigo-300">Target Difficulty</label>
+                                  <select
+                                    value={cbtConfigDifficulty}
+                                    onChange={(ev) => setCbtConfigDifficulty(ev.target.value)}
+                                    className="w-full bg-slate-950 border border-indigo-800 text-white p-2.5 text-xs rounded-xl focus:border-cyan-400 outline-none"
+                                  >
+                                    <option value="Easy">Easy (Grade school conceptual)</option>
+                                    <option value="Medium">Medium (Standard WAEC/NECO)</option>
+                                    <option value="Hard">Hard (JAMB High cognitive level)</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={async () => {
+                                  setIsGeneratingQuestions(true);
+                                  try {
+                                    const resp = await fetch("/api/ai/generate-questions", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        subject: activeNote.subject,
+                                        topic: activeNote.topic,
+                                        classLevel: activeNote.classLevel,
+                                        count: cbtConfigQuestionsCount,
+                                        difficulty: cbtConfigDifficulty,
+                                        noteContent: activeNote.content?.detailedNote || ""
+                                      })
+                                    });
+                                    if (resp.ok) {
+                                      const rData = await resp.json();
+                                      if (rData.questions) {
+                                        setCbtQuestions(rData.questions);
+                                        setCbtAnswers({});
+                                        setCbtCurrentQIdx(0);
+                                        setCbtTimer(15 * 60); // 15 mins
+                                        setCbtDuration(15);
+                                        setCbtFinished(false);
+                                        setCbtActive(true);
+                                      }
+                                    } else {
+                                      alert("Failed to build CBT assessment questions. Please try again shortly.");
+                                    }
+                                  } catch (error) {
+                                    console.error(error);
+                                    alert("Connection timeout occurred. Please try again.");
+                                  } finally {
+                                    setIsGeneratingQuestions(false);
+                                  }
+                                }}
+                                disabled={isGeneratingQuestions}
+                                className="w-full py-3 bg-cyan-400 hover:bg-cyan-500 disabled:opacity-40 text-slate-950 text-xs font-black rounded-xl transition cursor-pointer border-none flex items-center justify-center gap-2"
+                              >
+                                {isGeneratingQuestions ? (
+                                  <>
+                                    <svg className="animate-spin h-3.5 w-3.5 text-slate-950" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                    Composing CBT Exam...
+                                  </>
+                                ) : (
+                                  <>
+                                    <GraduationCap className="w-4 h-4" />
+                                    Launch Timed CBT Simulation
+                                  </>
+                                )}
+                              </button>
+                            </div>
+
+                            {/* Core stats note panel */}
+                            <div className="p-5 bg-white border border-slate-150 rounded-2xl space-y-2">
+                              <h5 className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Note Metadata</h5>
+                              <div className="text-xs space-y-1.5 font-medium text-slate-600">
+                                <div className="flex items-center justify-between">
+                                  <span>Created by:</span>
+                                  <span className="font-bold text-slate-800">{activeNote.creatorName || "Standard Admin Team"}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span>Added:</span>
+                                  <span className="font-bold text-slate-800">{new Date(activeNote.createdAt).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span>Sub-topic:</span>
+                                  <span className="font-bold text-slate-800 text-right truncate max-w-[120px]">{activeNote.subTopic || activeNote.topic}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                          </div>
+
+                        </div>
+                      );
+                    })()
+                  ) : showNoteGenForm ? (
+                    // Note Generation Form View
+                    <div className="p-6 bg-white border border-slate-150 rounded-3xl shadow-sm space-y-6">
+                      <div className="border-b border-slate-100 pb-3 flex items-center gap-1.5">
+                        <Sparkles className="w-5 h-5 text-indigo-600" />
+                        <h3 className="text-base font-black text-slate-900 font-sans">AI Study Lesson Guide Builder</h3>
+                      </div>
+                      
+                      <p className="text-xs text-slate-500 leading-relaxed font-semibold">
+                        Can't find an existing study note for your topic in <strong className="text-indigo-600 font-black">{selectedSubjForNotes}</strong>? Write any educational topic name below, and our premium NERDC AI compiler will instantly compose private, comprehensive study materials with formulas and evaluation lists corresponding to your level!
+                      </p>
+
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          setNoteGenError("");
+                          if (!noteGenTopic.trim()) {
+                            setNoteGenError("Please input an educational topic to study!");
+                            return;
+                          }
+                          setIsGeneratingNoteText(true);
+                          try {
+                            const res = await fetch("/api/ai/lesson-note", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                subject: selectedSubjForNotes,
+                                classLevel: noteGenClassLevel,
+                                topic: noteGenTopic,
+                                subTopic: noteGenSubTopic || noteGenTopic,
+                                teacherId: user.id,
+                                difficulty: "Medium",
+                              })
+                            });
+                            if (res.ok) {
+                              const data = await res.json();
+                              if (data.lessonNote) {
+                                // Prepend generated note
+                                setStudentNotes([data.lessonNote, ...studentNotes]);
+                                setSelectedNoteId(data.lessonNote.id);
+                                setShowNoteGenForm(false);
+                                setNoteGenTopic("");
+                                setNoteGenSubTopic("");
+                              } else {
+                                setNoteGenError("Failed to structure curriculum content layout. Please try a different topic keyword.");
+                              }
+                            } else {
+                              const errData = await res.json();
+                              setNoteGenError(errData.error || "Service timeout. Please try again.");
+                            }
+                          } catch (err: any) {
+                            setNoteGenError("Failed to communicate with AI generation gateway. Check connection.");
+                          } finally {
+                            setIsGeneratingNoteText(false);
+                          }
+                        }}
+                        className="space-y-4"
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5 text-slate-900">
+                            <label className="text-xs font-bold text-slate-700">Topic of Study *</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Quadratic Equations, Photosynthesis, Ohm's Law"
+                              value={noteGenTopic}
+                              onChange={(ev) => setNoteGenTopic(ev.target.value)}
+                              className="w-full bg-slate-50 border border-slate-250 text-slate-800 p-2.5 text-xs rounded-xl focus:border-indigo-505 outline-none"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5 text-slate-900">
+                            <label className="text-xs font-bold text-slate-700">Subtopic Detail (Optional)</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Graphic solutions, Light reactions, Resistivity"
+                              value={noteGenSubTopic}
+                              onChange={(ev) => setNoteGenSubTopic(ev.target.value)}
+                              className="w-full bg-slate-50 border border-slate-250 text-slate-800 p-2.5 text-xs rounded-xl focus:border-indigo-505 outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5 text-slate-900">
+                            <label className="text-xs font-bold text-slate-700">Class Section Level *</label>
+                            <select
+                              value={noteGenClassLevel}
+                              onChange={(ev) => setNoteGenClassLevel(ev.target.value)}
+                              className="w-full bg-slate-50 border border-slate-250 text-slate-800 p-2.5 text-xs rounded-xl focus:border-indigo-505 outline-none"
+                            >
+                              <option value="Senior Secondary Section 3">SSS 3 (Third Year)</option>
+                              <option value="Senior Secondary Section 2">SSS 2 (Second Year)</option>
+                              <option value="Senior Secondary Section 1">SSS 1 (First Year)</option>
+                              <option value="Junior Secondary Section 3">JSS 3 (Junior WAECBECE)</option>
+                              <option value="Junior Secondary Section 2">JSS 2 (Second JSS)</option>
+                              <option value="Junior Secondary Section 1">JSS 1 (Introductory Secondary)</option>
+                              <option value="Primary 6">Primary 6 Common Entrance</option>
+                              <option value="Primary 5">Primary 5</option>
+                              <option value="Primary 4">Primary 4</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {noteGenError && (
+                          <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-bold">
+                            ⚠️ {noteGenError}
+                          </div>
+                        )}
+
+                        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => setShowNoteGenForm(false)}
+                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer border-none"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isGeneratingNoteText}
+                            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-black rounded-xl transition cursor-pointer border-none flex items-center justify-center gap-1.5"
+                          >
+                            {isGeneratingNoteText ? (
+                              <>
+                                <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Composing Study Notes...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-3.5 h-3.5" />
+                                Compose Study Notes
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  ) : (
+                    // Default browse view listing
+                    (() => {
+                      const filteredNotes = studentNotes.filter(
+                        (n) => n.subject.toLowerCase() === selectedSubjForNotes.toLowerCase()
+                      );
+
+                      return (
+                        <div className="space-y-6">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-150 pb-2">
+                            <div>
+                              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{selectedSubjForNotes} Lessons Guides</h3>
+                              <p className="text-xs text-slate-500 font-medium">Browse currently published lessons materials or build your own study guides instantly.</p>
+                            </div>
+                            <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold border border-slate-200">
+                              {filteredNotes.length} Lessons Available
+                            </span>
+                          </div>
+
+                          {filteredNotes.length === 0 ? (
+                            <div className="p-12 bg-white rounded-3xl border border-slate-150 border-dashed text-center space-y-4">
+                              <BookOpen className="w-12 h-12 text-slate-300 mx-auto" strokeWidth={1.5} />
+                              <div className="space-y-1">
+                                <h4 className="text-base font-bold text-slate-800">No Existing Notes for {selectedSubjForNotes}</h4>
+                                <p className="text-xs text-slate-500 max-w-sm mx-auto">Click "Study a New Topic" below to generate a highly detailed study note using AI!</p>
+                              </div>
+                              <button
+                                onClick={() => setShowNoteGenForm(true)}
+                                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition cursor-pointer border-none shadow-sm inline-flex items-center gap-1.5"
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                Study a New Topic
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {filteredNotes.map((note) => (
+                                <div
+                                  key={note.id}
+                                  className="p-5 bg-white border border-slate-150 hover:border-indigo-200 rounded-3xl transition shadow-sm hover:shadow-md flex flex-col justify-between"
+                                >
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                      <span>Week {note.week || "1"}</span>
+                                      <span className="text-indigo-600">{note.classLevel}</span>
+                                    </div>
+                                    <div>
+                                      <h4 className="text-sm font-bold text-slate-800 line-clamp-1">{note.topic}</h4>
+                                      <p className="text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                                        {note.content?.detailedNote ? note.content.detailedNote.split(".")[0] + "." : ""}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-4">
+                                    <span className="text-[10px] text-slate-400 font-bold">
+                                      {new Date(note.createdAt).toLocaleDateString()}
+                                    </span>
+                                    <button
+                                      onClick={() => setSelectedNoteId(note.id)}
+                                      className="py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg transition cursor-pointer border-none flex items-center ml-auto gap-1"
+                                    >
+                                      Study Note
+                                      <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()
                   )}
                 </motion.div>
               )}

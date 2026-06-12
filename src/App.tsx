@@ -10,6 +10,7 @@ import { Exam } from './types';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [activePortalPerspective, setActivePortalPerspective] = useState<'student' | 'teacher' | 'admin'>('student');
   const [selectedCBTExam, setSelectedCBTExam] = useState<Exam | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [guestStudentName, setGuestStudentName] = useState('');
@@ -113,6 +114,18 @@ export default function App() {
   useEffect(() => {
     checkUserSession();
   }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      if (currentUser.role === 'teacher') {
+        setActivePortalPerspective('teacher');
+      } else if (currentUser.role === 'admin') {
+        setActivePortalPerspective('admin');
+      } else {
+        setActivePortalPerspective('student');
+      }
+    }
+  }, [currentUser]);
 
   const handleLogout = async () => {
     try {
@@ -646,7 +659,7 @@ export default function App() {
               <span className="text-slate-400 font-medium font-sans">User: </span>
               <strong className="text-white font-extrabold font-sans pr-1">{currentUser.name}</strong>
               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300">
-                {currentUser.role === 'teacher' ? 'Educator Portfolio' : 'Candidate Student'}
+                {currentUser.role === 'teacher' ? 'Educator Portfolio' : currentUser.role === 'admin' ? 'Administrator' : 'Candidate Student'}
               </span>
             </div>
           </div>
@@ -670,9 +683,60 @@ export default function App() {
           </div>
         </div>
 
+        {/* Unified Portal Selector Bar */}
+        <div className="bg-slate-800 border-b border-slate-950 px-6 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Active Workspace View:</span>
+            <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-md text-[10px] font-black uppercase tracking-wider border border-indigo-500/30">
+              {activePortalPerspective === 'teacher' ? "Teacher's Portal" : activePortalPerspective === 'admin' ? "Admin Portal" : "Student Portal"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+            <button
+              onClick={() => setActivePortalPerspective('student')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border-none ${
+                activePortalPerspective === 'student'
+                  ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-white/10'
+                  : 'bg-slate-900 text-slate-300 hover:bg-slate-750 hover:text-white'
+              }`}
+            >
+              <GraduationCap className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+              Student Portal
+            </button>
+            <button
+              onClick={() => setActivePortalPerspective('teacher')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border-none ${
+                activePortalPerspective === 'teacher'
+                  ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-white/10'
+                  : 'bg-slate-900 text-slate-300 hover:bg-slate-750 hover:text-white'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+              Teacher's Portal
+            </button>
+            <button
+              onClick={() => setActivePortalPerspective('admin')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border-none ${
+                activePortalPerspective === 'admin'
+                  ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-white/10'
+                  : 'bg-slate-900 text-slate-300 hover:bg-slate-750 hover:text-white'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5 text-indigo-400" />
+              Admin Portal
+            </button>
+          </div>
+        </div>
+
         <div className="flex-grow flex flex-col">
-          {currentUser.role === 'teacher' ? (
+          {activePortalPerspective === 'teacher' ? (
             <TeacherDashboard
+              user={currentUser}
+              onLogout={handleLogout}
+            />
+          ) : activePortalPerspective === 'admin' ? (
+            <AdminDashboard
               user={currentUser}
               onLogout={handleLogout}
             />
