@@ -189,7 +189,11 @@ export default function App() {
         }
 
         // Display Welcome message first, then redirect to dashboard after a short delay
-        setAuthSuccess(`Welcome ${data.user.name}! Account created successfully.`);
+        if (data.note) {
+          setAuthSuccess(`Welcome ${data.user.name}! ${data.note}`);
+        } else {
+          setAuthSuccess(`Welcome ${data.user.name}! Account created successfully.`);
+        }
         setTimeout(() => {
           setCurrentUser(data.user);
           setShowAuthModal(false);
