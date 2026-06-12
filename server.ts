@@ -1787,18 +1787,31 @@ app.post("/api/ai/lesson-note", async (req, res) => {
 
   let examplesRequirement = "";
   let examplesHint = "";
+  let examplesArrayPrompt = "";
+  let evaluationArrayPrompt = "";
+
   if (isCalcSubj) {
     examplesRequirement = `
-1. QUANTITY & FOCUS OF EXAMPLES (At least 3-4):
-   Since ${subject} is a calculation-heavy or formula-based science subject, you MUST include 3 to 4 detailed step-by-step solved calculation or formula-solving examples. Organization must be step-by-step with formulas and parameters.
+1. TEN (10) SOLVED CALCULATION QUESTIONS (EXACTLY 10):
+   Since ${subject} is a calculation-heavy or formula-based subject (Mathematics, Physics, Chemistry, etc.), you MUST include EXACTLY ten (10) separate, fully detailed, step-by-step solved calculation questions based on the topic "${topic}".
+   Each of these 10 solved questions MUST show:
+   - "Question [Number]: [Clear question statement]"
+   - "Formula(s) & Parameters"
+   - "Step-by-step Solution Walkout"
+   - "Final Answer"
+   YOU ARE STRICTLY REQUIRED to produce exactly ten (10) distinct solved problems inside the examples list. Do not generate fewer than ten.
 `;
-    examplesHint = "Detailed math or formula solved practical example with step-by-step mathematical workout lines";
+    examplesHint = "Solved calculation question (Question 1 to 10) with detailed formulas and step-by-step workout. Generate EXACTLY 10 solved questions.";
+    examplesArrayPrompt = "EXACTLY 10 separate solved calculation questions based on the topic, showing step-by-step solutions and formulas. DO NOT provide fewer than 10.";
+    evaluationArrayPrompt = "At least 5 to 10 distinct, test/assessment questions (e.g. past WAEC/NECO/JAMB past-question-style) with multiple-choice options or direct questions to evaluate student understanding. DO NOT use asterisks, hashtags, or markdown tables here.";
   } else {
     examplesRequirement = `
 1. RELEVANT ILLUSTRATIVE EXAMPLES (At least 3-4):
    CRITICAL: Since ${subject} is NOT a scientific or mathematical calculation subject, you are STRICTLY FORBIDDEN from including calculations below this note. Do NOT include formulas, variables, solving equations, maths, or calculations. Instead, provide 3 to 4 illustrative prose examples, real-life practical case studies, writing samples (for Language/English), or contextual scenarios relevant to the topic of ${topic}.
 `;
     examplesHint = `High-quality illustrative prose point, case study scenario, sentence example, or essay/reading sample relevant to ${topic}`;
+    examplesArrayPrompt = "Provide 3-4 detailed and culturally relevant conceptual prose examples. Do NOT use any asterisks, hashtags, or markdown tables here.";
+    evaluationArrayPrompt = "3-4 diagnostic assessment or past WAEC/NECO/JAMB past-question-style quiz questions to test student comprehension. Do NOT use asterisks, hashtags, or markdown tables here.";
   }
 
   const old_unused_str = `
@@ -1926,9 +1939,9 @@ Deliver the contents in a JSON schema structure:
       "learningPoints": "core learning points or cognitive concept corresponding to this step"
     }
   ],
-  "examples": ["${examplesHint} (Provide 2-3 detailed and culturally/mathematically relevant examples. Do NOT use any asterisks, hashtags, or markdown tables here)"],
+  "examples": ["${examplesHint} (${examplesArrayPrompt})"],
   "classActivities": ["2-3 interactive classroom active learning activities, discussion triggers, or question tasks to assess understanding during the lesson. Do NOT use asterisks, hashtags, or markdown tables here"],
-  "evaluation": ["3-4 diagnostic assessment or past WAEC/NECO/JAMB past-question-style quiz questions to test student comprehension. Do NOT use asterisks, hashtags, or markdown tables here"],
+  "evaluation": ["${evaluationArrayPrompt}"],
   "assignment": "A highly detailed, comprehensive homework assignment, essay prompt, or physical project for further study. Do NOT use asterisks, hashtags, or markdown tables here.",
   "conclusion": "Key points recapping the ultimate takeaways of the lesson comprehensively, structured strictly with plain Arabic numerals. Do NOT use asterisks, hashtags, or markdown tables here."
 }
