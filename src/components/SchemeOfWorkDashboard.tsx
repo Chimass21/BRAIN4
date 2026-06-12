@@ -20,7 +20,8 @@ import {
   Award,
   Sparkles,
   Bookmark,
-  Share2
+  Share2,
+  Upload
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { EDUCATION_LEVELS, generateWeeklyScheme, validateSyllabusUniqueness } from "../data/nigerianCurriculum";
@@ -61,6 +62,12 @@ export default function SchemeOfWorkDashboard({ user, userPerspective }: SchemeO
     homework: ""
   });
 
+  // Bulk CSV Scheme Import States
+  const [showBulkImportModal, setShowBulkImportModal] = useState<boolean>(false);
+  const [bulkCsvText, setBulkCsvText] = useState<string>("");
+  const [bulkImportError, setBulkImportError] = useState<string>("");
+  const [bulkImportSuccess, setBulkImportSuccess] = useState<string>("");
+
   // Yearly Update Simulation State
   const [academicYear, setAcademicYear] = useState<string>("2026/2027");
   const [curriculumStatus, setCurriculumStatus] = useState<string>("NERDC Standard Approved (Updated June 2026)");
@@ -80,21 +87,43 @@ export default function SchemeOfWorkDashboard({ user, userPerspective }: SchemeO
     setUniquenessReport(null);
   }, [selectedLevelId, selectedClass, selectedTerm, selectedSubject]);
 
-  const handleLoadScheme = () => {
-    const storageKey = `sow_${selectedLevelId}_${selectedClass.replace(/\s+/g, "_")}_${selectedSubject.replace(/\s+/g, "_")}_${selectedTerm.replace(/\s+/g, "_")}`;
-    const savedData = localStorage.getItem(storageKey);
+  const handleLoadScheme = async () => {
+    try {
+      const resp = await fetch(`/api/schemes?classLevel=${encodeURIComponent(selectedClass)}&subject=${encodeURIComponent(selectedSubject)}&term=${encodeURIComponent(selectedTerm)}`);
+      const data = await resp.json();
+      if (resp.ok && data.schemes && data.schemes.length > 0) {
+        setLoadedWeeks(data.schemes[0].weeks);
+      } else {
+        const storageKey = `sow_${selectedLevelId}_${selectedClass.replace(/\s+/g, "_")}_${selectedSubject.replace(/\s+/g, "_")}_${selectedTerm.replace(/\s+/g, "_")}`;
+        const savedData = localStorage.getItem(storageKey);
+        let freshWeeks;
+        if (savedData) {
+          try {
+            freshWeeks = JSON.parse(savedData);
+          } catch(e) {
+            freshWeeks = generateWeeklyScheme(selectedLevelId, selectedClass, selectedSubject, selectedTerm);
+          }
+        } else {
+          freshWeeks = generateWeeklyScheme(selectedLevelId, selectedClass, selectedSubject, selectedTerm);
+        }
+        setLoadedWeeks(freshWeeks);
 
-    if (savedData) {
-      try {
-        setLoadedWeeks(JSON.parse(savedData));
-      } catch (err) {
-        // Fallback to generator
-        const fallback = generateWeeklyScheme(selectedLevelId, selectedClass, selectedSubject, selectedTerm);
-        setLoadedWeeks(fallback);
+        // Auto seed newly created/generated local schemes to database
+        await fetch("/api/schemes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            classLevel: selectedClass,
+            subject: selectedSubject,
+            term: selectedTerm,
+            weeks: freshWeeks
+          })
+        });
       }
-    } else {
-      const freshWeeks = generateWeeklyScheme(selectedLevelId, selectedClass, selectedSubject, selectedTerm);
-      setLoadedWeeks(freshWeeks);
+    } catch (err) {
+      console.error("Failed to load schema from API, falling back:", err);
+      const fallback = generateWeeklyScheme(selectedLevelId, selectedClass, selectedSubject, selectedTerm);
+      setLoadedWeeks(fallback);
     }
 
     // Perform curriculum uniqueness verification dynamically
@@ -104,11 +133,26 @@ export default function SchemeOfWorkDashboard({ user, userPerspective }: SchemeO
     setIsLoaded(true);
   };
 
-  // Sync back to localstorage on change
-  const saveCurrentWeeksState = (newWeeks: WeeklySchemeUnit[]) => {
+  // Sync back to localstorage and database on change
+  const saveCurrentWeeksState = async (newWeeks: WeeklySchemeUnit[]) => {
     setLoadedWeeks(newWeeks);
     const storageKey = `sow_${selectedLevelId}_${selectedClass.replace(/\s+/g, "_")}_${selectedSubject.replace(/\s+/g, "_")}_${selectedTerm.replace(/\s+/g, "_")}`;
     localStorage.setItem(storageKey, JSON.stringify(newWeeks));
+
+    try {
+      await fetch("/api/schemes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          classLevel: selectedClass,
+          subject: selectedSubject,
+          term: selectedTerm,
+          weeks: newWeeks
+        })
+      });
+    } catch (e) {
+      console.error("Failed to upload scheme of work:", e);
+    }
   };
 
   // Switch class configuration lists
@@ -169,6 +213,90 @@ export default function SchemeOfWorkDashboard({ user, userPerspective }: SchemeO
     updated[index] = { ...updated[index], ...editFormData } as WeeklySchemeUnit;
     saveCurrentWeeksState(updated);
     setEditingWeekIndex(null);
+  };
+
+  const parseCSVText = (csv: string): WeeklySchemeUnit[] => {
+    const lines = csv.split(/\r?\n/);
+    if (lines.length < 2) throw new Error("CSV has no content or headers");
+
+    const headerLine = lines[0].toLowerCase();
+    let delimiter = ",";
+    if (headerLine.includes("\t")) delimiter = "\t";
+    else if (headerLine.includes(";")) delimiter = ";";
+
+    const headers = lines[0].split(delimiter).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
+    
+    const findIndex = (aliases: string[]) => {
+      return headers.findIndex(h => aliases.some(alias => h.includes(alias)));
+    };
+
+    const weekIdx = findIndex(["week"]);
+    const topicIdx = findIndex(["topic"]);
+    const subtopicIdx = findIndex(["subtopic", "sub-topic"]);
+    const objectivesIdx = findIndex(["objective", "learning objective", "learningobjectives"]);
+    const teachingIdx = findIndex(["teaching", "teacher"]);
+    const studentIdx = findIndex(["student"]);
+    const assessmentIdx = findIndex(["assessment", "evaluate"]);
+    const notesIdx = findIndex(["notes", "recap", "summary"]);
+    const homeworkIdx = findIndex(["homework", "assignment"]);
+
+    if (topicIdx === -1) {
+      throw new Error("Could not find a 'Topic' header in your CSV file. Please make sure the first row contains column headers.");
+    }
+
+    const units: WeeklySchemeUnit[] = [];
+
+    const splitCSVLine = (line: string, delim: string) => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"' || char === "'") {
+          inQuotes = !inQuotes;
+        } else if (char === delim && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const cols = splitCSVLine(line, delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
+      if (cols.length < 1) continue;
+
+      const weekNum = weekIdx !== -1 ? (Number(cols[weekIdx]) || i) : i;
+      const topic = cols[topicIdx] || `WeekTopic ${i}`;
+      const subtopic = subtopicIdx !== -1 ? cols[subtopicIdx] : "Syllabus details";
+      const objectives = objectivesIdx !== -1 ? cols[objectivesIdx] : "Cognitive understanding class-wide";
+      const teachingActivities = teachingIdx !== -1 ? cols[teachingIdx] : "Teacher guides learning content details.";
+      const studentActivities = studentIdx !== -1 ? cols[studentIdx] : "Students pay attention and complete exercises.";
+      const assessment = assessmentIdx !== -1 ? cols[assessmentIdx] : "Evaluation class exercises";
+      const notes = notesIdx !== -1 ? cols[notesIdx] : `Key highlights on ${topic}`;
+      const homework = homeworkIdx !== -1 ? cols[homeworkIdx] : "Practice textbook questions.";
+
+      units.push({
+        week: weekNum,
+        topic,
+        subtopic,
+        objectives,
+        teachingActivities,
+        studentActivities,
+        assessment,
+        notes,
+        homework
+      });
+    }
+
+    if (units.length === 0) throw new Error("No valid rows could be parsed from the CSV text");
+    return units;
   };
 
   // Add custom week topic
@@ -799,13 +927,29 @@ export default function SchemeOfWorkDashboard({ user, userPerspective }: SchemeO
 
             {/* Educator action */}
             {(userPerspective === "teacher" || userPerspective === "admin") && (
-              <button
-                onClick={() => setShowAddCustomTopicModal(true)}
-                className="py-1.5 px-3 bg-gradient-to-r from-violet-600 to-indigo-700 text-white hover:from-violet-700 hover:to-indigo-805 text-[10px] font-black rounded-lg transition border-none cursor-pointer flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Custom Week</span>
-              </button>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustomTopicModal(true)}
+                  className="py-1.5 px-3 bg-gradient-to-r from-violet-600 to-indigo-700 text-white hover:from-violet-700 hover:to-indigo-805 text-[10px] font-black rounded-lg transition border-none cursor-pointer flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Custom Week</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkImportError("");
+                    setBulkImportSuccess("");
+                    setBulkCsvText("");
+                    setShowBulkImportModal(true);
+                  }}
+                  className="py-1.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-700 text-white hover:from-emerald-700 hover:to-teal-800 text-[10px] font-black rounded-lg transition border-none cursor-pointer flex items-center gap-1"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Import CSV Scheme</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -1310,6 +1454,123 @@ export default function SchemeOfWorkDashboard({ user, userPerspective }: SchemeO
                   Confirm and Insert into Scheme
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: BULK CSV IMPORT SCHEME */}
+      <AnimatePresence>
+        {showBulkImportModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl w-full max-w-2xl p-6 md:p-8 border border-slate-200 space-y-6"
+            >
+              <div className="flex items-center justify-between border-b pb-4 border-slate-100">
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-tight flex items-center gap-1.5">
+                    <Upload className="w-5 h-5 text-emerald-600 animate-bounce" />
+                    Import CSV Scheme of Work
+                  </h3>
+                  <p className="text-xs text-slate-400">Class: <strong>{selectedClass}</strong> | Subject: <strong>{selectedSubject}</strong> | Term: <strong>{selectedTerm}</strong></p>
+                </div>
+                <button
+                  onClick={() => setShowBulkImportModal(false)}
+                  className="py-1 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 text-slate-400 text-xs font-black transition border-none cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-emerald-50 border border-emerald-150 p-4 rounded-xl text-xs space-y-2 text-emerald-850">
+                  <p className="font-extrabold text-emerald-950">Format Guidelines:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Requires headers: <code className="bg-emerald-100 px-1 py-0.5 rounded font-mono font-bold text-[10px]">Week, Topic</code> (mandatory)</li>
+                    <li>Optional headers: <code className="bg-emerald-100 px-1 py-0.5 rounded font-mono font-bold text-[10px]">Subtopic, Objectives, Teaching Activities, Student Activities, Assessment, Notes, Homework</code></li>
+                    <li>Supports any comma-separated or tab-separated text block.</li>
+                  </ul>
+                  <button
+                    onClick={() => {
+                      const sample = "Week,Topic,Subtopic,Objectives,Teaching Activities,Student Activities,Assessment,Notes,Homework\n" +
+                        "1,Our Body,Body parts,Identify names of body parts,Teacher points out different body parts with flashcards,Students sing names of body parts and draw hands,Quiz naming parts,Key summary of introduction of human physical architecture,Practice naming major body parts\n" +
+                        "2,Bathing Regularly,Care of standard skin,Explain the importance of daily showering,Teacher displays soap and water,Students mimic cleaning movements,Discussion grading,Skin hygiene rules for safety and general health,Bath twice daily task homework";
+                      setBulkCsvText(sample);
+                    }}
+                    className="py-1 px-2.5 bg-emerald-200 hover:bg-emerald-300 text-emerald-800 text-[10px] font-black rounded border-none cursor-pointer mt-1"
+                  >
+                    Load Sample CSV
+                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-black text-slate-500">Spreadsheet File Upload (Instant scanner)</label>
+                  <input
+                    type="file"
+                    accept=".csv,.txt"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          const text = evt.target?.result as string;
+                          setBulkCsvText(text);
+                        };
+                        reader.readAsText(file);
+                      }
+                    }}
+                    className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-black text-slate-500">Or Paste CSV Text Block</label>
+                  <textarea
+                    rows={8}
+                    value={bulkCsvText}
+                    onChange={(e) => setBulkCsvText(e.target.value)}
+                    placeholder="Week,Topic,Subtopic,Objectives,..."
+                    className="w-full p-3 font-mono text-xs bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white outline-none"
+                  />
+                </div>
+
+                {bulkImportError && (
+                  <p className="text-xs text-rose-600 font-extrabold bg-rose-50 border border-rose-100 p-2.5 rounded-xl">{bulkImportError}</p>
+                )}
+                {bulkImportSuccess && (
+                  <p className="text-xs text-emerald-600 font-extrabold bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl">{bulkImportSuccess}</p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setBulkImportError("");
+                      setBulkImportSuccess("");
+                      if (!bulkCsvText.trim()) {
+                        setBulkImportError("Please upload a file or paste CSV text first.");
+                        return;
+                      }
+                      
+                      const parsed = parseCSVText(bulkCsvText);
+                      await saveCurrentWeeksState(parsed);
+                      setBulkImportSuccess(`Succeeded! Parsed and stored ${parsed.length} weeks of Scheme of Work inside the centralized database!`);
+                      
+                      setTimeout(() => {
+                        setShowBulkImportModal(false);
+                      }, 1500);
+                    } catch (e: any) {
+                      setBulkImportError(e.message || "Failed parsing CSV data structure");
+                    }
+                  }}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer border-none"
+                >
+                  Import and Publish to Central Database
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

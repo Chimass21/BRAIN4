@@ -7,6 +7,7 @@ import { VoiceInputButton } from "./VoiceInputButton";
 import { speakText, stopSpeech } from "../utils/tts";
 import MyLibrary from "./MyLibrary";
 import SchemeOfWorkDashboard from "./SchemeOfWorkDashboard";
+import { EDUCATION_LEVELS, generateWeeklyScheme } from "../data/nigerianCurriculum";
 
 const renderFormattedList = (text: string | undefined) => {
   if (!text) return null;
@@ -85,6 +86,7 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
   const [subjects, setSubjects] = useState<string[]>([]);
   const [aiFromNoteContent, setAiFromNoteContent] = useState("");
   const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [schemesOfWork, setSchemesOfWork] = useState<any[]>([]);
 
   // Sub-tabs for Academics/Reports Management
   const [reportSubTab, setReportSubTab] = useState<'reports' | 'roster' | 'bulkGrading'>('reports');
@@ -301,6 +303,17 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
         console.error("Failed to load subjects list:", e);
       }
 
+      // Fetch schemes of work
+      try {
+        const schemeRes = await fetch("/api/schemes");
+        const schemeData = await schemeRes.json();
+        if (schemeRes.ok && schemeData.schemes) {
+          setSchemesOfWork(schemeData.schemes);
+        }
+      } catch (e) {
+        console.error("Failed to load schemes of work list:", e);
+      }
+
       // Fetch user profile with latest wallet (re-sync)
       const lpRes = await fetch('/api/admin/stats');
       const lpData = await lpRes.json();
@@ -323,6 +336,111 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
   useEffect(() => {
     fetchTeacherData();
   }, [user]);
+
+  const findSchemeForForm = (classLevel: string, subject: string) => {
+    if (!classLevel || !subject) return null;
+    const normClass = classLevel.toLowerCase().replace(/\s+/g, "");
+    const normSub = subject.toLowerCase().replace(/\s+/g, "");
+    const currentTerm = schoolConfig?.term || "First Term";
+
+    const dbScheme = (schemesOfWork || []).find((sch: any) => {
+      if (!sch) return false;
+      const schClass = (sch.classLevel || "").toLowerCase().replace(/\s+/g, "");
+      const schSub = (sch.subject || "").toLowerCase().replace(/\s+/g, "");
+      const schTerm = sch.term || "First Term";
+
+      const classMatches = schClass === normClass ||
+        (normClass.includes("grade7") && schClass.includes("jss1")) ||
+        (normClass.includes("grade8") && schClass.includes("jss2")) ||
+        (normClass.includes("grade9") && schClass.includes("jss3")) ||
+        (normClass.includes("grade10") && schClass.includes("ss1")) ||
+        (normClass.includes("grade11") && schClass.includes("ss2")) ||
+        (normClass.includes("grade12") && schClass.includes("ss3")) ||
+        (schClass.includes("grade7") && normClass.includes("jss1")) ||
+        (schClass.includes("grade8") && normClass.includes("jss2")) ||
+        (schClass.includes("grade9") && normClass.includes("jss3")) ||
+        (schClass.includes("grade10") && normClass.includes("ss1")) ||
+        (schClass.includes("grade11") && normClass.includes("ss2")) ||
+        (schClass.includes("grade12") && normClass.includes("ss3"));
+
+      return classMatches && schSub === normSub && schTerm === currentTerm;
+    });
+
+    if (dbScheme) return dbScheme;
+
+    let matchedLevelId = "primary";
+    let matchedClass = classLevel;
+
+    if (normClass.startsWith("primary") || normClass.startsWith("grade")) {
+      matchedLevelId = "primary";
+      matchedClass = classLevel.replace(/grade/i, "Primary");
+    } else if (normClass.startsWith("j") || normClass.startsWith("junior")) {
+      matchedLevelId = "junior_secondary";
+      matchedClass = classLevel.includes("3") ? "JSS 3" : classLevel.includes("2") ? "JSS 2" : "JSS 1";
+    } else if (normClass.startsWith("s") || normClass.startsWith("senior")) {
+      matchedLevelId = "senior_secondary";
+      matchedClass = classLevel.includes("3") ? "SS 3" : classLevel.includes("2") ? "SS 2" : "SS 1";
+    } else if (normClass.includes("nursery")) {
+      matchedLevelId = "nursery";
+    } else if (normClass.includes("pre")) {
+      matchedLevelId = "prenursery";
+    }
+
+    try {
+      const generated = generateWeeklyScheme(matchedLevelId, matchedClass, subject, currentTerm);
+      if (generated && generated.length > 0) {
+        return {
+          id: "temp_" + matchedClass + "_" + subject,
+          classLevel,
+          subject,
+          term: currentTerm,
+          weeks: generated
+        };
+      }
+    } catch (e) {
+      // silent catch
+    }
+
+    return null;
+  };
+
+  const renderSchemeOfWorkTopicDropdown = (
+    classVal: string,
+    subVal: string,
+    currentTopicVal: string,
+    onSelectTopic: (topic: string, subtopic: string, objectives?: string, weekNum?: number) => void
+  ) => {
+    const scheme = findSchemeForForm(classVal, subVal);
+    if (!scheme || !scheme.weeks || scheme.weeks.length === 0) return null;
+
+    return (
+      <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border border-indigo-100 rounded-2xl p-3.5 space-y-1.5 my-2">
+        <label className="text-[10px] uppercase font-black text-indigo-700 flex items-center gap-1">
+          <Layers className="w-3.5 h-3.5" />
+          <span>Selected SOW Topic ({scheme.term}):</span>
+        </label>
+        <select
+          onChange={(e) => {
+            const weekNum = Number(e.target.value);
+            const selectedUnit = scheme.weeks.find((w: any) => w.week === weekNum);
+            if (selectedUnit) {
+              onSelectTopic(selectedUnit.topic, selectedUnit.subtopic, selectedUnit.objectives, selectedUnit.week);
+            }
+          }}
+          value={scheme.weeks.find((w: any) => w.topic.trim().toLowerCase() === currentTopicVal.trim().toLowerCase())?.week || ""}
+          className="bg-white border border-indigo-200 text-indigo-900 rounded-xl p-2 text-xs w-full focus:outline-none font-bold"
+        >
+          <option value="">-- Choose active scheme topic (skip manual entry) --</option>
+          {scheme.weeks.map((w: any) => (
+            <option key={w.week} value={w.week}>
+              Week {w.week}: {w.topic} ({w.subtopic?.substring(0, 40)}...)
+            </option>
+          ))}
+        </select>
+        <p className="text-[9px] text-indigo-500 font-extrabold italic">✓ Selection automatically populates all curriculum parameters!</p>
+      </div>
+    );
+  };
 
   // --- SCHOOL REPORT CARD HANDLERS ---
   const handleSaveSchoolConfig = async (e: React.FormEvent) => {
@@ -1855,6 +1973,12 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
                             </div>
                           </div>
 
+                          {renderSchemeOfWorkTopicDropdown(spinClass, spinSubject, spinTopic, (t, s, _o, w) => {
+                            setSpinTopic(t);
+                            setSpinSubTopic(s);
+                            if (w) setSpinWeek(String(w));
+                          })}
+
                           <div className="space-y-1">
                             <label className="text-[10px] uppercase font-bold text-slate-600">Active Topic</label>
                             <div className="relative flex items-center">
@@ -2298,6 +2422,11 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
                             </div>
                           </div>
 
+                          {renderSchemeOfWorkTopicDropdown(noteClass, noteSubject, noteTopic, (t, s) => {
+                            setNoteTopic(t);
+                            setNoteSubTopic(s);
+                          })}
+
                           <div className="space-y-1">
                             <label className="text-[10px] uppercase font-bold text-slate-600">Topic Area</label>
                             <div className="relative flex items-center">
@@ -2658,6 +2787,9 @@ export default function TeacherDashboard({ user, onLogout }: TeacherDashboardPro
                       </div>
 
                       <div className="sm:col-span-2">
+                        {renderSchemeOfWorkTopicDropdown(aiClass, aiSubject, aiTopic, (t) => {
+                          setAiTopic(t);
+                        })}
                         <label className="text-xs font-bold text-slate-700 block mb-1">Topic details</label>
                         <div className="relative flex items-center">
                           <input required type="text" placeholder="e.g. 'all topics', 'Newton laws', 'Organic Chemistry'" value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} className="bg-slate-50 border rounded-xl p-2 pr-10 text-xs w-full focus:outline-none" />

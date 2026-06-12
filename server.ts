@@ -170,6 +170,7 @@ interface DbSchema {
   reportSheets?: any[];
   feedback?: any[];
   documents?: any[];
+  schemes?: any[];
 }
 
 const INITIAL_SUBJECTS = [
@@ -226,6 +227,7 @@ let db: DbSchema = {
   reportSheets: [],
   feedback: [],
   documents: [],
+  schemes: [],
 };
 
 function generateRegistrationNumber(): string {
@@ -530,6 +532,7 @@ function loadDatabase() {
       if (!db.transactions) db.transactions = [];
       if (!db.notifications) db.notifications = [];
       if (!db.documents) db.documents = [];
+      if (!db.schemes) db.schemes = [];
       if (!db.subjects || db.subjects.length === 0) {
         db.subjects = [...INITIAL_SUBJECTS];
       } else {
@@ -1538,6 +1541,66 @@ app.post("/api/subjects", (req, res) => {
   db.subjects.push(name);
   saveDatabase();
   res.json({ subjects: db.subjects });
+});
+
+// --- SCHEME OF WORK API ---
+app.get("/api/schemes", (req, res) => {
+  const { classLevel, subject, term } = req.query;
+  let list = db.schemes || [];
+  if (classLevel) {
+    list = list.filter(r => r && r.classLevel === (classLevel as string));
+  }
+  if (subject) {
+    list = list.filter(r => r && r.subject === (subject as string));
+  }
+  if (term) {
+    list = list.filter(r => r && r.term === (term as string));
+  }
+  res.json({ success: true, schemes: list });
+});
+
+app.post("/api/schemes", (req, res) => {
+  const { classLevel, subject, term, weeks } = req.body;
+  if (!classLevel || !subject || !term || !Array.isArray(weeks)) {
+    return res.status(400).json({ error: "Missing required fields: classLevel, subject, term, weeks array." });
+  }
+
+  if (!db.schemes) db.schemes = [];
+
+  const existingIndex = db.schemes.findIndex(
+    s => s && s.classLevel === classLevel && s.subject === subject && s.term === term
+  );
+
+  const schemeObj = {
+    id: existingIndex !== -1 ? db.schemes[existingIndex].id : "sch_" + Math.random().toString(36).substring(2, 11),
+    classLevel,
+    subject,
+    term,
+    weeks,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (existingIndex !== -1) {
+    db.schemes[existingIndex] = schemeObj;
+  } else {
+    db.schemes.push(schemeObj);
+  }
+
+  saveDatabase();
+  res.json({ success: true, scheme: schemeObj });
+});
+
+app.delete("/api/schemes", (req, res) => {
+  const { classLevel, subject, term } = req.query;
+  if (!classLevel || !subject || !term) {
+    return res.status(400).json({ error: "Missing required query params: classLevel, subject, term" });
+  }
+  if (!db.schemes) db.schemes = [];
+  db.schemes = db.schemes.filter(
+    s => s && !(s.classLevel === classLevel && s.subject === subject && s.term === term)
+  );
+  saveDatabase();
+  res.json({ success: true, message: "Scheme of work removed from database." });
 });
 
 // --- AI LESSON PLAN GENERATOR ---
